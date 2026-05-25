@@ -261,7 +261,7 @@ button[type="submit"], .primary {
   top: 10px;
   z-index: 3;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   padding: 9px;
   margin-bottom: 12px;
@@ -332,9 +332,15 @@ button[type="submit"], .primary {
 .status-Selesai { background: #dff1e6; color: var(--success); }
 .status-Terlambat { background: #f8dfd9; color: var(--danger); }
 .status-Dikerjakan { background: #fff0cc; color: var(--warning); }
+.status-Sudah-Dibayar { background: #dff1e6; color: var(--success); }
+.status-Belum-Dibayar { background: #fff0cc; color: var(--warning); }
 .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .actions button { min-height: 38px; padding: 8px 6px; color: var(--blue); background: #edf3fb; font-size: 12px; }
 .actions button.danger { color: var(--danger); background: #f6e2de; }
+.bill-form { margin-bottom: 18px; }
+.bill-filters { margin-bottom: 12px; }
+.bill-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bill-stats .stat-card:last-child span { font-size: clamp(22px, 3vw, 34px); }
 
 @media (max-width: 900px) {
   .login-shell { grid-template-columns: 1fr; }
@@ -352,7 +358,7 @@ button[type="submit"], .primary {
   .prayer-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .hero { align-items: flex-start; }
   .tabs { top: 0; gap: 5px; padding: 7px; }
-  .tabs button { font-size: 12px; padding-inline: 4px; }
+  .tabs button { font-size: 11px; padding-inline: 4px; }
   .form-row, .filters { grid-template-columns: 1fr; }
   .actions { grid-template-columns: repeat(2, 1fr); }
 }

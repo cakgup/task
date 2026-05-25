@@ -6,9 +6,16 @@ function getConfig() {
 
 const cfg = getConfig();
 let tasks = [];
+let bills = [];
 let activeTab = 'dashboard';
 
 const today = () => new Date().toISOString().slice(0, 10);
+const currentMonth = () => today().slice(0, 7);
+const currency = new Intl.NumberFormat('id-ID', {
+  style: 'currency',
+  currency: 'IDR',
+  maximumFractionDigits: 0
+});
 
 function normalizeDateOnly(value) {
   if (!value) return today();
@@ -166,8 +173,13 @@ function bindEvents() {
   $('taskForm').addEventListener('submit', saveTask);
   $('resetForm').onclick = resetForm;
   $('refreshBtn').onclick = loadTasks;
+  $('refreshBillsBtn').onclick = loadBills;
   $('filterChild').onchange = render;
   $('filterStatus').onchange = render;
+  $('filterBillMonth').onchange = renderBills;
+  $('filterBillStatus').onchange = renderBills;
+  $('billForm').addEventListener('submit', saveBill);
+  $('resetBillForm').onclick = resetBillForm;
   $('childrenSummary').onclick = (event) => {
     const card = event.target.closest('[data-child-name]');
     if (!card) return;
@@ -198,7 +210,9 @@ function showApp() {
   $('loginPage').hidden = true;
   $('app').hidden = false;
   $('taskDate').value = today();
+  resetBillForm();
   loadTasks();
+  loadBills();
 }
 
 function openTab(id) {
@@ -438,6 +452,181 @@ function render() {
   if (activeTab === 'history') {
     renderHistory();
   }
+
+  if (activeTab === 'bills') {
+    renderBills();
+  }
+}
+
+function normalizeBill(bill) {
+  return {
+    id: String(bill.id || `bil-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    tanggalInput: bill.tanggalInput || new Date().toISOString(),
+    nama: bill.nama || bill.name || '',
+    jumlah: Number(bill.jumlah || bill.amount || 0),
+    bulan: String(bill.bulan || bill.month || currentMonth()).slice(0, 7),
+    jatuhTempo: normalizeDateOnly(bill.jatuhTempo || bill.dueDate || today()),
+    status: bill.status === 'Sudah Dibayar' ? 'Sudah Dibayar' : 'Belum Dibayar',
+    waktuBayar: bill.waktuBayar || '',
+    catatan: bill.catatan || bill.note || ''
+  };
+}
+
+function resetBillForm() {
+  $('billForm').reset();
+  $('billId').value = '';
+  $('billMonth').value = currentMonth();
+  $('billDueDate').value = today();
+  updateBillMonthFilter();
+}
+
+function updateBillMonthFilter() {
+  const filter = $('filterBillMonth');
+  const selected = filter.value || currentMonth();
+  const months = Array.from(new Set([currentMonth(), ...bills.map((bill) => bill.bulan)])).sort().reverse();
+
+  filter.innerHTML = months
+    .map((month) => `<option value="${escapeHtml(month)}">${escapeHtml(month)}</option>`)
+    .join('');
+  filter.value = months.includes(selected) ? selected : currentMonth();
+}
+
+async function loadBills() {
+  try {
+    if (cfg.GAS_URL) {
+      const response = await fetch(`${cfg.GAS_URL}?action=getBills&ts=${Date.now()}`);
+      const json = await response.json();
+      if (json.success === false) throw new Error(json.message || 'Gagal membaca tagihan');
+      const rows = Array.isArray(json) ? json : (json.data || []);
+      bills = rows.map(normalizeBill).filter((bill) => bill.id && bill.nama);
+    } else {
+      bills = JSON.parse(localStorage.getItem('cakgupBills') || '[]').map(normalizeBill);
+    }
+  } catch (error) {
+    bills = JSON.parse(localStorage.getItem('cakgupBills') || '[]').map(normalizeBill);
+  }
+
+  localStorage.setItem('cakgupBills', JSON.stringify(bills));
+  updateBillMonthFilter();
+  renderBills();
+}
+
+async function persistBill(action, payload) {
+  localStorage.setItem('cakgupBills', JSON.stringify(bills));
+  await sendToGas(action, payload);
+}
+
+async function saveBill(event) {
+  event.preventDefault();
+
+  const id = $('billId').value || `bil-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const old = bills.find((bill) => bill.id === id);
+  const bill = normalizeBill({
+    id,
+    tanggalInput: old?.tanggalInput || new Date().toISOString(),
+    nama: $('billName').value,
+    jumlah: $('billAmount').value,
+    bulan: $('billMonth').value,
+    jatuhTempo: $('billDueDate').value,
+    status: old?.status || 'Belum Dibayar',
+    waktuBayar: old?.waktuBayar || '',
+    catatan: $('billNote').value
+  });
+
+  bills = old
+    ? bills.map((item) => item.id === id ? bill : item)
+    : [bill, ...bills];
+
+  await persistBill(old ? 'updateBill' : 'addBill', { bill });
+  resetBillForm();
+  renderBills();
+  setStatus('Tagihan tersimpan.');
+}
+
+function editBill(id) {
+  const bill = bills.find((item) => item.id === id);
+  if (!bill) return;
+
+  $('billId').value = bill.id;
+  $('billName').value = bill.nama;
+  $('billAmount').value = bill.jumlah || '';
+  $('billMonth').value = bill.bulan;
+  $('billDueDate').value = bill.jatuhTempo;
+  $('billNote').value = bill.catatan;
+  openTab('bills');
+}
+
+async function setBillStatus(id, status) {
+  const waktuBayar = status === 'Sudah Dibayar' ? new Date().toISOString() : '';
+
+  bills = bills.map((bill) => {
+    if (bill.id !== id) return bill;
+    return {
+      ...bill,
+      status,
+      waktuBayar: status === 'Sudah Dibayar' ? waktuBayar : ''
+    };
+  });
+
+  await persistBill('updateBillStatus', { id, status, waktuBayar });
+  renderBills();
+  setStatus('Status tagihan diperbarui.');
+}
+
+async function deleteBill(id) {
+  if (!confirm('Hapus tagihan ini?')) return;
+
+  bills = bills.filter((bill) => bill.id !== id);
+  await persistBill('deleteBill', { id });
+  updateBillMonthFilter();
+  renderBills();
+  setStatus('Tagihan dihapus.');
+}
+
+function renderBills() {
+  if (!$('billList')) return;
+
+  updateBillMonthFilter();
+  const month = $('filterBillMonth').value || currentMonth();
+  const status = $('filterBillStatus').value || 'all';
+  const list = bills
+    .filter((bill) => bill.bulan === month && (status === 'all' || bill.status === status))
+    .sort((a, b) => `${a.jatuhTempo}${a.nama}`.localeCompare(`${b.jatuhTempo}${b.nama}`));
+  const monthBills = bills.filter((bill) => bill.bulan === month);
+  const paid = monthBills.filter((bill) => bill.status === 'Sudah Dibayar');
+  const unpaid = monthBills.filter((bill) => bill.status !== 'Sudah Dibayar');
+
+  $('billTotal').textContent = monthBills.length;
+  $('billPaid').textContent = paid.length;
+  $('billUnpaid').textContent = unpaid.length;
+  $('billUnpaidAmount').textContent = currency.format(unpaid.reduce((sum, bill) => sum + bill.jumlah, 0));
+
+  $('billList').innerHTML = list.length
+    ? list.map(billCard).join('')
+    : '<article class="task-card">Belum ada tagihan untuk bulan ini.</article>';
+}
+
+function billCard(bill) {
+  const safeId = escapeHtml(bill.id);
+  const action = bill.status === 'Sudah Dibayar'
+    ? `<button onclick="setBillStatus('${safeId}','Belum Dibayar')">Tandai belum</button>`
+    : `<button onclick="setBillStatus('${safeId}','Sudah Dibayar')">Sudah dibayar</button>`;
+
+  return `<article class="task-card bill-card">
+    <h3>${escapeHtml(bill.nama)}</h3>
+    <p>${escapeHtml(bill.catatan || 'Tidak ada catatan.')}</p>
+    <div class="meta">
+      <span class="pill">${escapeHtml(bill.bulan)}</span>
+      <span class="pill">Jatuh tempo: ${escapeHtml(bill.jatuhTempo)}</span>
+      <span class="pill">${escapeHtml(currency.format(bill.jumlah))}</span>
+      <span class="pill status-${escapeHtml(bill.status.replace(/\s+/g, '-'))}">${escapeHtml(bill.status)}</span>
+    </div>
+    <div class="actions bill-actions">
+      ${action}
+      <button onclick="editBill('${safeId}')">Edit</button>
+      <button class="danger" onclick="deleteBill('${safeId}')">Hapus</button>
+    </div>
+  </article>`;
 }
 
 function renderDashboard() {

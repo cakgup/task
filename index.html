@@ -61,6 +61,7 @@
       <button data-tab="add">Tambah</button>
       <button data-tab="tasks">Tugas</button>
       <button data-tab="history">Riwayat</button>
+      <button data-tab="bills">Tagihan</button>
     </nav>
 
     <section id="syncStatus" class="sync-status">Mode lokal aktif. Sinkronisasi belum diatur.</section>
@@ -129,6 +130,42 @@
     <section id="history" class="panel">
       <h2>Riwayat & Evaluasi</h2>
       <div id="historyList" class="task-list"></div>
+    </section>
+
+    <section id="bills" class="panel">
+      <div class="section-head">
+        <h2>Tagihan Bulanan</h2>
+        <button id="refreshBillsBtn" class="small-btn">Muat ulang</button>
+      </div>
+      <div class="stats-grid bill-stats">
+        <article class="stat-card"><span id="billTotal">0</span><small>Total Bulan Ini</small></article>
+        <article class="stat-card"><span id="billPaid">0</span><small>Sudah Dibayar</small></article>
+        <article class="stat-card"><span id="billUnpaid">0</span><small>Belum Dibayar</small></article>
+        <article class="stat-card"><span id="billUnpaidAmount">Rp0</span><small>Sisa Tagihan</small></article>
+      </div>
+
+      <form id="billForm" class="task-form bill-form">
+        <input type="hidden" id="billId" />
+        <label>Nama Tagihan<input id="billName" required placeholder="Contoh: SPP sekolah" /></label>
+        <div class="form-row">
+          <label>Bulan<input id="billMonth" type="month" required /></label>
+          <label>Jatuh Tempo<input id="billDueDate" type="date" required /></label>
+        </div>
+        <label>Jumlah<input id="billAmount" type="number" min="0" step="1000" placeholder="Contoh: 250000" /></label>
+        <label>Catatan<textarea id="billNote" rows="2" placeholder="Opsional"></textarea></label>
+        <button type="submit" class="primary">Simpan Tagihan</button>
+        <button type="button" id="resetBillForm" class="secondary">Kosongkan</button>
+      </form>
+
+      <div class="filters bill-filters">
+        <select id="filterBillMonth" aria-label="Filter bulan tagihan"></select>
+        <select id="filterBillStatus" aria-label="Filter status tagihan">
+          <option value="all">Semua Status</option>
+          <option>Belum Dibayar</option>
+          <option>Sudah Dibayar</option>
+        </select>
+      </div>
+      <div id="billList" class="task-list"></div>
     </section>
   </main>
 

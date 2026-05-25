@@ -1,4 +1,5 @@
 const SHEET_NAME = 'tasks';
+const BILL_SHEET_NAME = 'bills';
 
 function doGet(e) {
   e = e || { parameter: {} };
@@ -6,6 +7,10 @@ function doGet(e) {
 
   if (action === 'getTasks' || action === 'list') {
     return getTasks();
+  }
+
+  if (action === 'getBills') {
+    return getBills();
   }
 
   if (action === 'setup') {
@@ -26,6 +31,10 @@ function doPost(e) {
     if (action === 'updateTask' || action === 'update') return updateTask(data.task || data);
     if (action === 'updateStatus' || action === 'status') return updateStatus(data);
     if (action === 'deleteTask' || action === 'delete') return deleteTask(data.id);
+    if (action === 'addBill') return addBill(data.bill || data);
+    if (action === 'updateBill') return updateBill(data.bill || data);
+    if (action === 'updateBillStatus') return updateBillStatus(data);
+    if (action === 'deleteBill') return deleteBill(data.id);
 
     return jsonResponse({ success: false, message: 'Action POST tidak dikenali', action });
   } catch (err) {
@@ -181,4 +190,119 @@ function deleteTask(id) {
 
 function testRun() {
   return setupSheet();
+}
+
+function getBillHeaders() {
+  return [
+    'id', 'tanggalInput', 'nama', 'jumlah', 'bulan', 'jatuhTempo',
+    'status', 'waktuBayar', 'catatan'
+  ];
+}
+
+function getBillSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(BILL_SHEET_NAME);
+
+  if (!sheet) sheet = ss.insertSheet(BILL_SHEET_NAME);
+
+  const headers = getBillHeaders();
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  } else {
+    const existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
+    const isHeaderEmpty = existingHeaders.every(v => String(v || '').trim() === '');
+    if (isHeaderEmpty) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  return sheet;
+}
+
+function getBills() {
+  const sheet = getBillSheet();
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) return jsonResponse({ success: true, data: [] });
+
+  const headers = values.shift();
+  const timezone = Session.getScriptTimeZone();
+
+  const data = values
+    .filter(row => row.some(cell => String(cell || '').trim() !== ''))
+    .map(row => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        if (!header) return;
+        let value = row[index];
+        if (value instanceof Date) {
+          value = Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
+        }
+        obj[header] = value;
+      });
+      return obj;
+    });
+
+  return jsonResponse({ success: true, data });
+}
+
+function addBill(bill) {
+  const sheet = getBillSheet();
+  const id = bill.id || ('bil-' + Date.now());
+
+  sheet.appendRow([
+    id,
+    bill.tanggalInput || new Date(),
+    bill.nama || '',
+    Number(bill.jumlah || 0),
+    bill.bulan || '',
+    bill.jatuhTempo || '',
+    bill.status || 'Belum Dibayar',
+    bill.waktuBayar || '',
+    bill.catatan || ''
+  ]);
+
+  return jsonResponse({ success: true, message: 'Tagihan berhasil ditambahkan.', id });
+}
+
+function updateBill(bill) {
+  const sheet = getBillSheet();
+  const row = findRowById(sheet, bill.id);
+
+  if (row < 0) return addBill(bill);
+
+  sheet.getRange(row, 1, 1, 9).setValues([[
+    bill.id,
+    bill.tanggalInput || sheet.getRange(row, 2).getValue() || new Date(),
+    bill.nama || '',
+    Number(bill.jumlah || 0),
+    bill.bulan || '',
+    bill.jatuhTempo || '',
+    bill.status || 'Belum Dibayar',
+    bill.waktuBayar || '',
+    bill.catatan || ''
+  ]]);
+
+  return jsonResponse({ success: true, message: 'Tagihan berhasil diperbarui.' });
+}
+
+function updateBillStatus(data) {
+  const sheet = getBillSheet();
+  const row = findRowById(sheet, data.id);
+
+  if (row < 0) return jsonResponse({ success: false, message: 'Tagihan tidak ditemukan.' });
+
+  sheet.getRange(row, 7).setValue(data.status || 'Belum Dibayar');
+  sheet.getRange(row, 8).setValue(data.status === 'Sudah Dibayar' ? (data.waktuBayar || new Date()) : '');
+
+  return jsonResponse({ success: true, message: 'Status tagihan berhasil diperbarui.' });
+}
+
+function deleteBill(id) {
+  const sheet = getBillSheet();
+  const row = findRowById(sheet, id);
+
+  if (row < 0) return jsonResponse({ success: false, message: 'Tagihan tidak ditemukan.' });
+
+  sheet.deleteRow(row);
+  return jsonResponse({ success: true, message: 'Tagihan berhasil dihapus.' });
 }
