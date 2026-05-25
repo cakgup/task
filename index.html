@@ -3,36 +3,58 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f3d3e" />
+  <meta name="theme-color" content="#1A3A6B" />
   <title>CakGup - Pawiyatan Tugas Keluarga</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="ambient ambient-1" aria-hidden="true"></div>
+  <div class="ambient ambient-2" aria-hidden="true"></div>
+
   <div id="loginPage" class="login-page">
-    <section class="login-card">
-      <div class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 120 150" role="img">
-          <path d="M60 5 C22 43 15 87 31 118 C42 139 78 139 89 118 C105 87 98 43 60 5Z" fill="currentColor" opacity=".95"/>
-          <path d="M60 26 C42 53 39 82 48 101 C54 114 66 114 72 101 C81 82 78 53 60 26Z" fill="#f6d58f" opacity=".95"/>
-          <circle cx="60" cy="75" r="9" fill="#143b3c" opacity=".95"/>
-          <path d="M35 126 H85 L78 145 H42 Z" fill="currentColor"/>
-        </svg>
-      </div>
-      <p class="eyebrow">CakGup</p>
-      <h1>Pawiyatan Tugas Keluarga</h1>
-      <p class="subtitle">Ngatur tugas omah, sinau, lan kabiasaan saben dina kanthi rasa guyub.</p>
-      <section class="login-prayer-widget" aria-label="Jadwal shalat DKI Jakarta dan sekitarnya">
-        <div class="prayer-caption">Waktu Shalat DKI Jakarta dan Sekitarnya</div>
-        <div class="prayer-strip" id="loginPrayerTimes">
-          <div class="prayer-time-item is-loading"><span>Memuat</span><strong>--:--</strong></div>
+    <section class="login-shell">
+      <div class="login-copy">
+        <div class="brand-lockup">
+          <span class="brand-mark">CG</span>
+          <span>
+            <strong>CakGup Family Task</strong>
+            <small>Pawiyatan Tugas Keluarga</small>
+          </span>
         </div>
+        <p class="eyebrow">Ruang keluarga</p>
+        <h1>Pawiyatan Tugas Keluarga</h1>
+        <p class="subtitle">Ngatur tugas omah, sinau, lan kabiasaan saben dina kanthi rasa guyub.</p>
+
+        <section class="login-prayer-widget" aria-label="Jadwal shalat DKI Jakarta dan sekitarnya">
+          <div class="prayer-caption">Waktu Shalat DKI Jakarta dan Sekitarnya</div>
+          <div class="prayer-strip" id="loginPrayerTimes">
+            <div class="prayer-time-item is-loading"><span>Memuat</span><strong>--:--</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="login-card">
+        <div class="login-card-head">
+          <div class="brand-icon" aria-hidden="true">
+            <svg viewBox="0 0 120 150" role="img">
+              <path d="M60 5 C22 43 15 87 31 118 C42 139 78 139 89 118 C105 87 98 43 60 5Z" fill="currentColor" opacity=".95"/>
+              <path d="M60 26 C42 53 39 82 48 101 C54 114 66 114 72 101 C81 82 78 53 60 26Z" fill="#ffca1a" opacity=".95"/>
+              <circle cx="60" cy="75" r="9" fill="#102747" opacity=".95"/>
+              <path d="M35 126 H85 L78 145 H42 Z" fill="currentColor"/>
+            </svg>
+          </div>
+          <div>
+            <p class="eyebrow">Mlebet</p>
+            <h2>Kode Masuk</h2>
+          </div>
+        </div>
+        <form id="loginForm" class="login-form">
+          <label for="password">Masukkan kode</label>
+          <input id="password" type="password" placeholder="Masukkan: cakgup" autocomplete="current-password" />
+          <button type="submit">Mlebet</button>
+          <p id="loginError" class="error" hidden>Kode belum tepat.</p>
+        </form>
       </section>
-      <form id="loginForm" class="login-form">
-        <label for="password">Kode Masuk</label>
-        <input id="password" type="password" placeholder="Masukkan: cakgup" autocomplete="current-password" />
-        <button type="submit">Mlebet</button>
-        <p id="loginError" class="error" hidden>Kode belum tepat.</p>
-      </form>
     </section>
   </div>
 
