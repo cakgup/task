@@ -449,10 +449,6 @@ function render() {
     renderTasks();
   }
 
-  if (activeTab === 'history') {
-    renderHistory();
-  }
-
   if (activeTab === 'bills') {
     renderBills();
   }
@@ -732,16 +728,6 @@ function renderTasks() {
   $('taskList').innerHTML = list.length
     ? list.map(card).join('')
     : '<article class="task-card">Belum ada tugas.</article>';
-}
-
-function renderHistory() {
-  const done = [...tasks]
-    .sort((a, b) => `${b.tanggalTugas || ''}${b.jamTarget || ''}`.localeCompare(`${a.tanggalTugas || ''}${a.jamTarget || ''}`))
-    .slice(0, 80);
-
-  $('historyList').innerHTML = done.length
-    ? done.map(card).join('')
-    : '<article class="task-card">Riwayat masih kosong.</article>';
 }
 
 init();
