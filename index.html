@@ -1,23 +1,125 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CakGup ToDo</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3b1f12" />
+  <title>CakGup — Pawiyatan Tugas Keluarga</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Serif+Javanese:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="login-box" id="loginBox">
-    <h1>CakGup Family</h1>
-    <input type="password" id="password" placeholder="Masukkan kode">
-    <button onclick="login()">Masuk</button>
-    <p id="loginError" hidden>Kode salah</p>
+  <div id="loginPage" class="login-page">
+    <div class="ornament top">ꦲꦤꦕꦫꦏ</div>
+    <section class="login-card">
+      <div class="gunungan" aria-hidden="true">
+        <svg viewBox="0 0 120 150" role="img">
+          <path d="M60 5 C22 43 15 87 31 118 C42 139 78 139 89 118 C105 87 98 43 60 5Z" fill="currentColor" opacity=".95"/>
+          <path d="M60 26 C42 53 39 82 48 101 C54 114 66 114 72 101 C81 82 78 53 60 26Z" fill="#f4d59a" opacity=".9"/>
+          <circle cx="60" cy="75" r="9" fill="#3b1f12" opacity=".9"/>
+          <path d="M35 126 H85 L78 145 H42 Z" fill="currentColor"/>
+        </svg>
+      </div>
+      <p class="eyebrow">ꦕꦏ꧀ꦒꦸꦥ꧀</p>
+      <h1>Pawiyatan Tugas Keluarga</h1>
+      <p class="subtitle">Ngatur tugas omah, sinau, lan kabiasaan saben dina kanthi rasa guyub.</p>
+      <form id="loginForm" class="login-form">
+        <label for="password">Kode Masuk</label>
+        <input id="password" type="password" placeholder="Masukkan: cakgup" autocomplete="current-password" />
+        <button type="submit">Mlebet</button>
+        <p id="loginError" class="error" hidden>Kode belum tepat.</p>
+      </form>
+    </section>
+    <div class="ornament bottom">ꦢꦠꦱꦮꦭ</div>
   </div>
 
-  <div id="app" hidden>
-    <h2>Dashboard Tugas</h2>
-    <div id="taskList"></div>
-  </div>
+  <main id="app" class="app" hidden>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">CakGup Family Task</p>
+        <h1>Wilujeng, Rama</h1>
+        <p id="todayLabel">Memuat tanggal...</p>
+      </div>
+      <button id="logoutBtn" class="icon-btn">Logout</button>
+    </header>
+
+    <nav class="tabs" aria-label="Menu utama">
+      <button data-tab="dashboard" class="active">Pendapa</button>
+      <button data-tab="add">Tambah</button>
+      <button data-tab="tasks">Tugas</button>
+      <button data-tab="history">Riwayat</button>
+    </nav>
+
+    <section id="syncStatus" class="sync-status">Mode lokal aktif. Atur GAS di config.js agar tersinkron.</section>
+
+    <section id="dashboard" class="panel active">
+      <div class="stats-grid">
+        <article class="stat-card"><span id="statTotal">0</span><small>Total Hari Ini</small></article>
+        <article class="stat-card"><span id="statDone">0</span><small>Selesai</small></article>
+        <article class="stat-card"><span id="statPending">0</span><small>Belum/Proses</small></article>
+        <article class="stat-card"><span id="statLate">0</span><small>Terlambat</small></article>
+      </div>
+      <h2>Rekap Anak</h2>
+      <div id="childrenSummary" class="children-summary"></div>
+    </section>
+
+    <section id="add" class="panel">
+      <h2>Tambah Dhawuh/Tugas</h2>
+      <form id="taskForm" class="task-form">
+        <input type="hidden" id="taskId" />
+        <label>Judul Tugas<input id="title" required placeholder="Contoh: Menyapu ruang tamu" /></label>
+        <label>Anak
+          <select id="child" required></select>
+        </label>
+        <label>Kategori
+          <select id="category">
+            <option>Beberes Rumah</option>
+            <option>Belajar</option>
+            <option>Ibadah/Kedisiplinan</option>
+            <option>Pribadi</option>
+            <option>Lainnya</option>
+          </select>
+        </label>
+        <div class="form-row">
+          <label>Tanggal<input id="taskDate" type="date" required /></label>
+          <label>Jam Target<input id="targetTime" type="time" /></label>
+        </div>
+        <label>Prioritas
+          <select id="priority">
+            <option>Normal</option>
+            <option>Tinggi</option>
+            <option>Rendah</option>
+          </select>
+        </label>
+        <label>Deskripsi<textarea id="description" rows="3" placeholder="Catatan singkat tugas"></textarea></label>
+        <label>Catatan Rama<textarea id="note" rows="2" placeholder="Opsional"></textarea></label>
+        <button type="submit" class="primary">Simpan Tugas</button>
+        <button type="button" id="resetForm" class="secondary">Kosongkan</button>
+      </form>
+    </section>
+
+    <section id="tasks" class="panel">
+      <div class="section-head">
+        <h2>Daftar Tugas</h2>
+        <button id="refreshBtn" class="small-btn">Refresh</button>
+      </div>
+      <div class="filters">
+        <select id="filterChild"><option value="all">Semua Anak</option></select>
+        <select id="filterStatus">
+          <option value="all">Semua Status</option>
+          <option>Belum</option><option>Proses</option><option>Selesai</option><option>Terlambat</option>
+        </select>
+      </div>
+      <div id="taskList" class="task-list"></div>
+    </section>
+
+    <section id="history" class="panel">
+      <h2>Riwayat & Evaluasi</h2>
+      <div id="historyList" class="task-list"></div>
+    </section>
+  </main>
 
   <script src="config.js"></script>
   <script src="app.js"></script>

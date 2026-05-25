@@ -4,45 +4,181 @@ function doGet(e) {
   e = e || { parameter: {} };
   const action = e.parameter.action || 'getTasks';
 
-  if (action === 'getTasks') {
+  if (action === 'getTasks' || action === 'list') {
     return getTasks();
   }
 
-  return jsonResponse({success:false});
+  if (action === 'setup') {
+    return setupSheet();
+  }
+
+  return jsonResponse({ success: false, message: 'Action GET tidak dikenali', action });
 }
 
-function jsonResponse(obj){
+function doPost(e) {
+  try {
+    e = e || {};
+    const body = e.postData && e.postData.contents ? e.postData.contents : '{}';
+    const data = JSON.parse(body);
+    const action = data.action;
+
+    if (action === 'addTask' || action === 'create') return addTask(data.task || data);
+    if (action === 'updateTask' || action === 'update') return updateTask(data.task || data);
+    if (action === 'updateStatus' || action === 'status') return updateStatus(data);
+    if (action === 'deleteTask' || action === 'delete') return deleteTask(data.id);
+
+    return jsonResponse({ success: false, message: 'Action POST tidak dikenali', action });
+  } catch (err) {
+    return jsonResponse({ success: false, message: err.message });
+  }
+}
+
+function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function getSheet(){
+function getHeaders() {
+  return [
+    'id', 'tanggalInput', 'namaAnak', 'judul', 'deskripsi', 'kategori',
+    'tanggalTugas', 'jamTarget', 'prioritas', 'status', 'waktuSelesai', 'catatan'
+  ];
+}
+
+function getSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
 
-  if(!sheet){
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['id','namaAnak','judul','status']);
+  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
+
+  const headers = getHeaders();
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  } else {
+    const existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
+    const isHeaderEmpty = existingHeaders.every(v => String(v || '').trim() === '');
+    if (isHeaderEmpty) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
 
   return sheet;
 }
 
-function getTasks(){
-  const sheet = getSheet();
-  const data = sheet.getDataRange().getValues();
+function setupSheet() {
+  getSheet();
+  return jsonResponse({ success: true, message: 'Sheet tasks berhasil disiapkan.' });
+}
 
-  if(data.length <= 1){
-    return jsonResponse({success:true,data:[]});
+function getTasks() {
+  const sheet = getSheet();
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) return jsonResponse({ success: true, data: [] });
+
+  const headers = values.shift();
+  const timezone = Session.getScriptTimeZone();
+
+  const data = values
+    .filter(row => row.some(cell => String(cell || '').trim() !== ''))
+    .map(row => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        if (!header) return;
+        let value = row[index];
+        if (value instanceof Date) {
+          value = Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
+        }
+        obj[header] = value;
+      });
+      return obj;
+    });
+
+  return jsonResponse({ success: true, data });
+}
+
+function findRowById(sheet, id) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(id)) return i + 2;
+  }
+  return -1;
+}
+
+function addTask(task) {
+  const sheet = getSheet();
+  const id = task.id || ('tsk-' + Date.now());
+
+  sheet.appendRow([
+    id,
+    task.tanggalInput || new Date(),
+    task.namaAnak || '',
+    task.judul || '',
+    task.deskripsi || '',
+    task.kategori || '',
+    task.tanggalTugas || '',
+    task.jamTarget || '',
+    task.prioritas || 'Normal',
+    task.status || 'Belum',
+    task.waktuSelesai || '',
+    task.catatan || ''
+  ]);
+
+  return jsonResponse({ success: true, message: 'Tugas berhasil ditambahkan.', id });
+}
+
+function updateTask(task) {
+  const sheet = getSheet();
+  const row = findRowById(sheet, task.id);
+
+  if (row < 0) return addTask(task);
+
+  sheet.getRange(row, 1, 1, 12).setValues([[
+    task.id,
+    task.tanggalInput || sheet.getRange(row, 2).getValue() || new Date(),
+    task.namaAnak || '',
+    task.judul || '',
+    task.deskripsi || '',
+    task.kategori || '',
+    task.tanggalTugas || '',
+    task.jamTarget || '',
+    task.prioritas || 'Normal',
+    task.status || 'Belum',
+    task.waktuSelesai || '',
+    task.catatan || ''
+  ]]);
+
+  return jsonResponse({ success: true, message: 'Tugas berhasil diperbarui.' });
+}
+
+function updateStatus(data) {
+  const sheet = getSheet();
+  const row = findRowById(sheet, data.id);
+
+  if (row < 0) return jsonResponse({ success: false, message: 'Tugas tidak ditemukan.' });
+
+  sheet.getRange(row, 10).setValue(data.status || 'Belum');
+
+  if (data.status === 'Selesai') {
+    sheet.getRange(row, 11).setValue(data.waktuSelesai || new Date());
   }
 
-  const rows = data.slice(1).map(r=>({
-    id:r[0],
-    namaAnak:r[1],
-    judul:r[2],
-    status:r[3]
-  }));
+  return jsonResponse({ success: true, message: 'Status tugas berhasil diperbarui.' });
+}
 
-  return jsonResponse({success:true,data:rows});
+function deleteTask(id) {
+  const sheet = getSheet();
+  const row = findRowById(sheet, id);
+
+  if (row < 0) return jsonResponse({ success: false, message: 'Tugas tidak ditemukan.' });
+
+  sheet.deleteRow(row);
+  return jsonResponse({ success: true, message: 'Tugas berhasil dihapus.' });
+}
+
+function testRun() {
+  return setupSheet();
 }
