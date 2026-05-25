@@ -1,11 +1,22 @@
-const cfg = window.CAKGUP_CONFIG;
 const $ = (id) => document.getElementById(id);
+
+function getConfig() {
+  return window.CAKGUP_CONFIG || { APP_PASSWORD: '', GAS_URL: '', CHILDREN: [] };
+}
+
+const cfg = getConfig();
 let tasks = [];
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => `tsk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 function init() {
+  if (!window.CAKGUP_CONFIG) {
+    const error = $('loginError');
+    error.textContent = 'Konfigurasi belum terbaca. Pastikan config.js ikut terupload dan dimuat sebelum app.js.';
+    error.hidden = false;
+    return;
+  }
   $('todayLabel').textContent = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
   }).format(new Date());
@@ -19,15 +30,33 @@ function init() {
 }
 
 function bindEvents() {
-  $('loginForm').addEventListener('submit', (e) => {
+  $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const kode = $('password').value.trim();
+    const error = $('loginError');
+    const submitButton = e.submitter || $('loginForm').querySelector('button[type="submit"]');
+
+    error.hidden = true;
 
     if (kode === cfg.APP_PASSWORD) {
       localStorage.setItem('cakgupLoggedIn', 'yes');
-      showApp();
+      submitButton.disabled = true;
+      submitButton.textContent = 'Mlebet...';
+
+      try {
+        await showApp();
+      } catch (error) {
+        console.error('Gagal membuka aplikasi:', error);
+        localStorage.removeItem('cakgupLoggedIn');
+        $('loginError').textContent = 'Login benar, tetapi aplikasi gagal dibuka. Cek console browser untuk detail.';
+        $('loginError').hidden = false;
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Mlebet';
+      }
     } else {
-      $('loginError').hidden = false;
+      error.textContent = 'Kode belum tepat.';
+      error.hidden = false;
     }
   });
 
@@ -319,3 +348,4 @@ function renderHistory() {
 }
 
 init();
+
