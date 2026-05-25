@@ -10,6 +10,15 @@ let activeTab = 'dashboard';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => `tsk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const childNameAliases = {
+  'Anak Pertama': 'Fatiyyah',
+  'Anak Kedua': 'Alifah',
+  'Anak Ketiga': 'Fatih'
+};
+
+function normalizeChildName(name) {
+  return childNameAliases[name] || name || '';
+}
 
 function init() {
   if (!window.CAKGUP_CONFIG) {
@@ -118,7 +127,7 @@ function normalizeTask(task) {
   return {
     id: String(task.id || uid()),
     tanggalInput: task.tanggalInput || new Date().toISOString(),
-    namaAnak: task.namaAnak || '',
+    namaAnak: normalizeChildName(task.namaAnak),
     judul: task.judul || '',
     deskripsi: task.deskripsi || '',
     kategori: task.kategori || 'Lainnya',
