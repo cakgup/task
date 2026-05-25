@@ -311,6 +311,17 @@ button[type="submit"], .primary {
 .child-card, .task-card { padding: 16px; }
 .child-card h3, .task-card h3 { margin: 0 0 6px; color: var(--blue-3); }
 .child-card p, .task-card p { margin: 0 0 10px; color: var(--muted); line-height: 1.5; }
+.child-card-button {
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.child-card-button:hover,
+.child-card-button:focus {
+  border-color: rgba(255, 202, 26, .88);
+  box-shadow: 0 12px 30px rgba(6, 18, 38, .12);
+  transform: translateY(-1px);
+  outline: none;
+}
 .progress { height: 9px; overflow: hidden; border-radius: 999px; background: #dce8f6; }
 .progress span { display: block; height: 100%; background: var(--yellow); }
 

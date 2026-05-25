@@ -168,6 +168,18 @@ function bindEvents() {
   $('refreshBtn').onclick = loadTasks;
   $('filterChild').onchange = render;
   $('filterStatus').onchange = render;
+  $('childrenSummary').onclick = (event) => {
+    const card = event.target.closest('[data-child-name]');
+    if (!card) return;
+    showChildTasks(card.dataset.childName);
+  };
+  $('childrenSummary').onkeydown = (event) => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    const card = event.target.closest('[data-child-name]');
+    if (!card) return;
+    event.preventDefault();
+    showChildTasks(card.dataset.childName);
+  };
 }
 
 function fillChildren() {
@@ -201,6 +213,12 @@ function openTab(id) {
   });
 
   render();
+}
+
+function showChildTasks(childName) {
+  $('filterChild').value = childName;
+  $('filterStatus').value = 'all';
+  openTab('tasks');
 }
 
 function setStatus(message) {
@@ -435,7 +453,7 @@ function renderDashboard() {
     const done = arr.filter((task) => task.status === 'Selesai').length;
     const pct = arr.length ? Math.round(done / arr.length * 100) : 0;
 
-    return `<article class="child-card">
+    return `<article class="child-card child-card-button" data-child-name="${escapeHtml(child.name)}" tabindex="0" role="button" aria-label="Lihat tugas ${escapeHtml(child.name)}">
       <h3>${escapeHtml(child.name)}</h3>
       <p>${escapeHtml(child.school)} · ${done}/${arr.length} selesai</p>
       <div class="progress"><span style="width:${pct}%"></span></div>
