@@ -20,6 +20,74 @@ function normalizeChildName(name) {
   return childNameAliases[name] || name || '';
 }
 
+const fallbackPrayerTimes = [
+  { name: 'Imsak', time: '04:15' },
+  { name: 'Subuh', time: '04:25' },
+  { name: 'Syuruq', time: '05:42' },
+  { name: 'Dzuhur', time: '11:41' },
+  { name: 'Ashar', time: '15:02' },
+  { name: 'Maghrib', time: '17:47' },
+  { name: 'Isya', time: '18:59' }
+];
+
+function minutesFromTime(time) {
+  const [hour, minute] = String(time || '00:00').split(':').map(Number);
+  return (hour || 0) * 60 + (minute || 0);
+}
+
+function nextPrayerIndex(times) {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const index = times.findIndex((item) => minutesFromTime(item.time) > nowMinutes);
+  return index >= 0 ? index : 1;
+}
+
+function renderPrayerTimes(times, sourceLabel = 'fallback lokal') {
+  const container = $('loginPrayerTimes');
+  if (!container) return;
+
+  const nextIndex = nextPrayerIndex(times);
+  container.innerHTML = times.map((item, index) => `
+    <div class="prayer-time-item${index === nextIndex ? ' next' : ''}" title="${sourceLabel}">
+      <span>${escapeHtml(item.name)}</span>
+      <strong>${escapeHtml(item.time || '--:--')}</strong>
+    </div>
+  `).join('');
+}
+
+async function fetchPrayerTimes() {
+  renderPrayerTimes(fallbackPrayerTimes, 'Jadwal fallback lokal');
+
+  try {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const response = await fetch(`https://api.myquran.com/v2/sholat/jadwal/1301/${year}/${month}/${day}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const result = await response.json();
+    const jadwal = result?.data?.jadwal;
+    if (!jadwal) throw new Error('Format jadwal tidak sesuai');
+
+    renderPrayerTimes([
+      { name: 'Imsak', time: jadwal.imsak },
+      { name: 'Subuh', time: jadwal.subuh },
+      { name: 'Syuruq', time: jadwal.terbit },
+      { name: 'Dzuhur', time: jadwal.dzuhur },
+      { name: 'Ashar', time: jadwal.ashar },
+      { name: 'Maghrib', time: jadwal.maghrib },
+      { name: 'Isya', time: jadwal.isya }
+    ], 'API jadwal shalat DKI Jakarta');
+  } catch (error) {
+    console.warn('Gagal mengambil jadwal shalat; menggunakan fallback lokal.', error);
+  }
+}
+
+function initPrayerTimes() {
+  fetchPrayerTimes();
+  setInterval(fetchPrayerTimes, 60 * 60 * 1000);
+}
 function init() {
   if (!window.CAKGUP_CONFIG) {
     const error = $('loginError');
@@ -27,6 +95,8 @@ function init() {
     error.hidden = false;
     return;
   }
+  initPrayerTimes();
+
   $('todayLabel').textContent = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
   }).format(new Date());

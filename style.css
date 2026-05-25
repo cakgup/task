@@ -48,7 +48,7 @@ button:disabled { cursor: wait; opacity: .7; }
 }
 
 .login-card {
-  width: min(100%, 440px);
+  width: min(100%, 560px);
   background: rgba(255, 255, 255, .96);
   border: 1px solid rgba(255, 255, 255, .7);
   border-radius: 22px;
@@ -326,4 +326,74 @@ button[type="submit"], .primary {
   .form-row, .filters { grid-template-columns: 1fr; }
   .actions { grid-template-columns: repeat(2, 1fr); }
   .login-card { padding: 24px; }
+}
+
+.login-prayer-widget {
+  margin: 0 0 22px;
+  padding: 14px;
+  border: 1px solid rgba(246, 213, 143, .28);
+  border-radius: 18px;
+  background: linear-gradient(155deg, #0b3f43, #123f6b);
+  box-shadow: 0 14px 30px rgba(12, 48, 65, .16);
+}
+
+.prayer-caption {
+  margin-bottom: 9px;
+  color: rgba(255, 255, 255, .82);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.prayer-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.prayer-time-item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 7px;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .08);
+  text-align: center;
+}
+
+.prayer-time-item span {
+  color: rgba(255, 255, 255, .68);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.prayer-time-item strong {
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.prayer-time-item.next {
+  border-color: rgba(229, 183, 90, .92);
+  background: linear-gradient(160deg, #e5b75a, #ffe39b);
+  box-shadow: 0 8px 18px rgba(229, 183, 90, .24);
+}
+
+.prayer-time-item.next span,
+.prayer-time-item.next strong {
+  color: #0b3f43;
+}
+
+.prayer-time-item.is-loading {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 420px) {
+  .prayer-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .prayer-time-item strong { font-size: 16px; }
 }
