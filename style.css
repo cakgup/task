@@ -152,18 +152,10 @@ h2 { margin: 0 0 16px; color: var(--blue-3); font-size: 24px; }
 }
 
 .login-card-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  display: block;
   margin-bottom: 22px;
 }
-.login-card-head .eyebrow { margin: 0 0 8px; }
 .login-card-head h2 { margin: 0; }
-
-.brand-icon {
-  width: 70px;
-  color: var(--blue);
-}
 
 .login-form, .task-form { display: grid; gap: 14px; }
 label { color: #34445d; font-size: 13px; font-weight: 850; }
@@ -346,8 +338,6 @@ button[type="submit"], .primary {
   .login-page { padding: 14px; align-items: start; }
   .brand-lockup { margin-bottom: 28px; }
   .login-card { padding: 20px; }
-  .login-card-head { align-items: flex-start; }
-  .brand-icon { width: 54px; }
   .prayer-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .hero { align-items: flex-start; }
   .tabs { top: 0; gap: 5px; padding: 7px; }

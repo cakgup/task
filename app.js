@@ -9,6 +9,16 @@ let tasks = [];
 let activeTab = 'dashboard';
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+function normalizeDateOnly(value) {
+  if (!value) return today();
+  const text = String(value).trim();
+  const match = text.match(/^\d{4}-\d{2}-\d{2}/);
+  if (match) return match[0];
+
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? today() : date.toISOString().slice(0, 10);
+}
 const uid = () => `tsk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const childNameAliases = {
   'Anak Pertama': 'Fatiyyah',
@@ -121,7 +131,7 @@ function bindEvents() {
     if (kode === cfg.APP_PASSWORD) {
       localStorage.setItem('cakgupLoggedIn', 'yes');
       submitButton.disabled = true;
-      submitButton.textContent = 'Mlebet...';
+      submitButton.textContent = 'Masuk...';
 
       try {
         await showApp();
@@ -132,7 +142,7 @@ function bindEvents() {
         $('loginError').hidden = false;
       } finally {
         submitButton.disabled = false;
-        submitButton.textContent = 'Mlebet';
+        submitButton.textContent = 'Masuk';
       }
     } else {
       error.textContent = 'Kode belum tepat.';
@@ -162,7 +172,7 @@ function fillChildren() {
     cfg.CHILDREN.forEach((child) => {
       const option = document.createElement('option');
       option.value = child.name;
-      option.textContent = `${child.name} — ${child.school}`;
+      option.textContent = `${child.name} - ${child.school}`;
       el.appendChild(option);
     });
   });
@@ -201,7 +211,7 @@ function normalizeTask(task) {
     judul: task.judul || '',
     deskripsi: task.deskripsi || '',
     kategori: task.kategori || 'Lainnya',
-    tanggalTugas: task.tanggalTugas || today(),
+    tanggalTugas: normalizeDateOnly(task.tanggalTugas),
     jamTarget: task.jamTarget || '',
     prioritas: task.prioritas || 'Normal',
     status: task.status || 'Belum',
@@ -210,6 +220,49 @@ function normalizeTask(task) {
   };
 }
 
+function dailyTaskKey(task) {
+  return [
+    normalizeDateOnly(task.tanggalTugas),
+    normalizeChildName(task.namaAnak || task.child),
+    task.judul || task.title,
+    task.catatan || (task.load ? `Beban: ${task.load}` : '')
+  ].join('|').toLowerCase();
+}
+
+function createDailyTask(template) {
+  return normalizeTask({
+    id: uid(),
+    tanggalInput: new Date().toISOString(),
+    namaAnak: template.child,
+    judul: template.title,
+    deskripsi: template.description || `Beban: ${template.load}`,
+    kategori: template.category || 'Beberes Rumah',
+    tanggalTugas: today(),
+    jamTarget: template.time || '',
+    prioritas: template.priority || 'Normal',
+    status: 'Belum',
+    waktuSelesai: '',
+    catatan: `Beban: ${template.load}`
+  });
+}
+
+async function ensureDailyTasks() {
+  const templates = Array.isArray(cfg.DAILY_TASKS) ? cfg.DAILY_TASKS : [];
+  if (!templates.length) return;
+
+  const existingKeys = new Set(tasks.map(dailyTaskKey));
+  const missingTasks = templates
+    .map(createDailyTask)
+    .filter((task) => !existingKeys.has(dailyTaskKey(task)));
+
+  if (!missingTasks.length) return;
+
+  tasks = [...missingTasks, ...tasks];
+  localStorage.setItem('cakgupTasks', JSON.stringify(tasks));
+
+  await Promise.all(missingTasks.map((task) => sendToGas('addTask', { task })));
+  setStatus(`${missingTasks.length} tugas harian dibuat otomatis untuk hari ini.`);
+}
 async function loadTasks() {
   setStatus('Mengambil data dari Google Sheet...');
 
@@ -220,13 +273,16 @@ async function loadTasks() {
       const rows = Array.isArray(json) ? json : (json.data || []);
       tasks = rows.map(normalizeTask).filter((task) => task.id && task.judul);
       localStorage.setItem('cakgupTasks', JSON.stringify(tasks));
+      await ensureDailyTasks();
       setStatus('Data tersinkron dengan Google Sheet.');
     } else {
       tasks = JSON.parse(localStorage.getItem('cakgupTasks') || '[]').map(normalizeTask);
+      await ensureDailyTasks();
       setStatus('Mode lokal aktif. GAS_URL belum diisi.');
     }
   } catch (error) {
     tasks = JSON.parse(localStorage.getItem('cakgupTasks') || '[]').map(normalizeTask);
+    await ensureDailyTasks();
     setStatus('Gagal membaca GAS. Sementara memakai data lokal di HP ini.');
   }
 
