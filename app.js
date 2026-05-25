@@ -6,6 +6,7 @@ function getConfig() {
 
 const cfg = getConfig();
 let tasks = [];
+let activeTab = 'dashboard';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => `tsk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -88,14 +89,16 @@ function fillChildren() {
   });
 }
 
-async function showApp() {
+function showApp() {
   $('loginPage').hidden = true;
   $('app').hidden = false;
   $('taskDate').value = today();
-  await loadTasks();
+  loadTasks();
 }
 
 function openTab(id) {
+  activeTab = id;
+
   document.querySelectorAll('.tabs button').forEach((button) => {
     button.classList.toggle('active', button.dataset.tab === id);
   });
@@ -103,6 +106,8 @@ function openTab(id) {
   document.querySelectorAll('.panel').forEach((panel) => {
     panel.classList.toggle('active', panel.id === id);
   });
+
+  render();
 }
 
 function setStatus(message) {
@@ -268,8 +273,14 @@ function resetForm() {
 
 function render() {
   renderDashboard();
-  renderTasks();
-  renderHistory();
+
+  if (activeTab === 'tasks') {
+    renderTasks();
+  }
+
+  if (activeTab === 'history') {
+    renderHistory();
+  }
 }
 
 function renderDashboard() {
@@ -340,7 +351,9 @@ function renderTasks() {
 }
 
 function renderHistory() {
-  const done = [...tasks].sort((a, b) => `${b.tanggalTugas || ''}${b.jamTarget || ''}`.localeCompare(`${a.tanggalTugas || ''}${a.jamTarget || ''}`));
+  const done = [...tasks]
+    .sort((a, b) => `${b.tanggalTugas || ''}${b.jamTarget || ''}`.localeCompare(`${a.tanggalTugas || ''}${a.jamTarget || ''}`))
+    .slice(0, 80);
 
   $('historyList').innerHTML = done.length
     ? done.map(card).join('')
