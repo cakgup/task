@@ -30,10 +30,14 @@ function normalizeChildName(name) {
   return childNameAliases[name] || name || '';
 }
 
+function normalizeStatus(status) {
+  return status === 'Proses' ? 'Dikerjakan' : (status || 'Belum');
+}
+
 const fallbackPrayerTimes = [
   { name: 'Imsak', time: '04:15' },
   { name: 'Subuh', time: '04:25' },
-  { name: 'Syuruq', time: '05:42' },
+  { name: 'Terbit', time: '05:42' },
   { name: 'Dzuhur', time: '11:41' },
   { name: 'Ashar', time: '15:02' },
   { name: 'Maghrib', time: '17:47' },
@@ -83,7 +87,7 @@ async function fetchPrayerTimes() {
     renderPrayerTimes([
       { name: 'Imsak', time: jadwal.imsak },
       { name: 'Subuh', time: jadwal.subuh },
-      { name: 'Syuruq', time: jadwal.terbit },
+      { name: 'Terbit', time: jadwal.terbit },
       { name: 'Dzuhur', time: jadwal.dzuhur },
       { name: 'Ashar', time: jadwal.ashar },
       { name: 'Maghrib', time: jadwal.maghrib },
@@ -138,7 +142,7 @@ function bindEvents() {
       } catch (error) {
         console.error('Gagal membuka aplikasi:', error);
         localStorage.removeItem('cakgupLoggedIn');
-        $('loginError').textContent = 'Login benar, tetapi aplikasi gagal dibuka. Cek console browser untuk detail.';
+        $('loginError').textContent = 'Kode benar, tetapi aplikasi gagal dibuka. Cek console browser untuk detail.';
         $('loginError').hidden = false;
       } finally {
         submitButton.disabled = false;
@@ -214,7 +218,7 @@ function normalizeTask(task) {
     tanggalTugas: normalizeDateOnly(task.tanggalTugas),
     jamTarget: task.jamTarget || '',
     prioritas: task.prioritas || 'Normal',
-    status: task.status || 'Belum',
+    status: normalizeStatus(task.status),
     waktuSelesai: task.waktuSelesai || '',
     catatan: task.catatan || ''
   };
@@ -236,7 +240,7 @@ function createDailyTask(template) {
     namaAnak: template.child,
     judul: template.title,
     deskripsi: template.description || `Beban: ${template.load}`,
-    kategori: template.category || 'Beberes Rumah',
+    kategori: template.category || 'Pekerjaan Rumah',
     tanggalTugas: today(),
     jamTarget: template.time || '',
     prioritas: template.priority || 'Normal',
@@ -278,7 +282,7 @@ async function loadTasks() {
     } else {
       tasks = JSON.parse(localStorage.getItem('cakgupTasks') || '[]').map(normalizeTask);
       await ensureDailyTasks();
-      setStatus('Mode lokal aktif. GAS_URL belum diisi.');
+      setStatus('Mode lokal aktif. Sinkronisasi belum diatur.');
     }
   } catch (error) {
     tasks = JSON.parse(localStorage.getItem('cakgupTasks') || '[]').map(normalizeTask);
@@ -339,7 +343,7 @@ async function saveTask(e) {
   resetForm();
   openTab('tasks');
   render();
-  setStatus('Tugas tersimpan. Tekan Refresh untuk memastikan data dari Google Sheet sudah terbaru.');
+  setStatus('Tugas tersimpan. Tekan Muat ulang untuk memastikan data dari Google Sheet sudah terbaru.');
 }
 
 function refreshLate() {
@@ -423,7 +427,7 @@ function renderDashboard() {
 
   $('statTotal').textContent = todays.length;
   $('statDone').textContent = todays.filter((task) => task.status === 'Selesai').length;
-  $('statPending').textContent = todays.filter((task) => ['Belum', 'Proses'].includes(task.status)).length;
+  $('statPending').textContent = todays.filter((task) => ['Belum', 'Dikerjakan'].includes(task.status)).length;
   $('statLate').textContent = todays.filter((task) => task.status === 'Terlambat').length;
 
   $('childrenSummary').innerHTML = cfg.CHILDREN.map((child) => {
@@ -464,7 +468,7 @@ function card(task) {
     </div>
     ${task.catatan ? `<p><b>Catatan:</b> ${escapeHtml(task.catatan)}</p>` : ''}
     <div class="actions">
-      <button onclick="setTaskStatus('${safeId}','Proses')">Proses</button>
+      <button onclick="setTaskStatus('${safeId}','Dikerjakan')">Dikerjakan</button>
       <button onclick="setTaskStatus('${safeId}','Selesai')">Selesai</button>
       <button onclick="editTask('${safeId}')">Edit</button>
       <button class="danger" onclick="delTask('${safeId}')">Hapus</button>

@@ -1,4 +1,4 @@
-# CakGup ToDoList Jawa — Final
+# CakGup Tugas Keluarga
 
 Paket ini sudah dikompilasi ulang untuk GitHub Pages + Google Apps Script.
 
@@ -13,7 +13,7 @@ URL tersebut sudah dimasukkan ke `config.js`.
 ## Isi file
 
 - `index.html` — halaman utama aplikasi
-- `style.css` — tema Jawa/Sogan mobile-first
+- `style.css` — tema modern mobile-first
 - `app.js` — logika aplikasi
 - `config.js` — password statis dan URL GAS
 - `gas/Code.gs` — backend Google Apps Script

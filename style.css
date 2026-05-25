@@ -320,7 +320,7 @@ button[type="submit"], .primary {
 .pill { border-radius: 999px; padding: 6px 10px; background: #edf3fb; color: #455873; font-size: 12px; font-weight: 850; }
 .status-Selesai { background: #dff1e6; color: var(--success); }
 .status-Terlambat { background: #f8dfd9; color: var(--danger); }
-.status-Proses { background: #fff0cc; color: var(--warning); }
+.status-Dikerjakan { background: #fff0cc; color: var(--warning); }
 .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .actions button { min-height: 38px; padding: 8px 6px; color: var(--blue); background: #edf3fb; font-size: 12px; }
 .actions button.danger { color: var(--danger); background: #f6e2de; }
