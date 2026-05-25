@@ -472,6 +472,43 @@ function normalizeBill(bill) {
   };
 }
 
+function billSeedKey(bill) {
+  return [
+    bill.bulan || bill.month,
+    bill.nama || bill.name
+  ].join('|').toLowerCase();
+}
+
+function createSeedBill(template) {
+  const month = template.month || currentMonth();
+  return normalizeBill({
+    id: `seed-${month}-${String(template.name).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    tanggalInput: new Date().toISOString(),
+    nama: template.name,
+    jumlah: template.amount || 0,
+    bulan: month,
+    jatuhTempo: template.dueDate || `${month}-28`,
+    status: template.status || 'Belum Dibayar',
+    waktuBayar: template.status === 'Sudah Dibayar' ? new Date().toISOString() : '',
+    catatan: template.note || ''
+  });
+}
+
+function ensureSeedBills() {
+  const templates = Array.isArray(cfg.MONTHLY_BILLS) ? cfg.MONTHLY_BILLS : [];
+  if (!templates.length) return;
+
+  const existingKeys = new Set(bills.map(billSeedKey));
+  const missingBills = templates
+    .map(createSeedBill)
+    .filter((bill) => !existingKeys.has(billSeedKey(bill)));
+
+  if (!missingBills.length) return;
+
+  bills = [...missingBills, ...bills];
+  localStorage.setItem('cakgupBills', JSON.stringify(bills));
+}
+
 function resetBillForm() {
   $('billForm').reset();
   $('billId').value = '';
@@ -506,6 +543,7 @@ async function loadBills() {
     bills = JSON.parse(localStorage.getItem('cakgupBills') || '[]').map(normalizeBill);
   }
 
+  ensureSeedBills();
   localStorage.setItem('cakgupBills', JSON.stringify(bills));
   updateBillMonthFilter();
   renderBills();

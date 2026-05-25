@@ -18,5 +18,22 @@ window.CAKGUP_CONFIG = {
     { child: 'Fatih', title: 'Buang sampah', load: 1, category: 'Pekerjaan Rumah' },
     { child: 'Alifah', title: 'Mengangkat jemuran dan menurunkan baju', load: 1, category: 'Pekerjaan Rumah' },
     { child: 'Fatih', title: 'Memasak nasi', load: 1, category: 'Pekerjaan Rumah' }
+  ],
+  MONTHLY_BILLS: [
+    { name: 'SPP Fatih', month: '2026-05', status: 'Sudah Dibayar', note: 'Pendidikan & Sekolah' },
+    { name: 'SPP Alifah', month: '2026-05', status: 'Sudah Dibayar', note: 'Pendidikan & Sekolah' },
+    { name: 'SPP Fatiyyah', month: '2026-05', status: 'Sudah Dibayar', note: 'Pendidikan & Sekolah' },
+    { name: 'Jemputan Fatih', month: '2026-05', status: 'Sudah Dibayar', note: 'Pendidikan & Sekolah' },
+    { name: 'Fingermatic Fatih', month: '2026-05', status: 'Belum Dibayar', note: 'Pendidikan & Sekolah' },
+    { name: 'Listrik Bekasi', month: '2026-05', status: 'Sudah Dibayar', note: 'Rumah Tangga & Utilitas' },
+    { name: 'Biznet', month: '2026-05', status: 'Sudah Dibayar', note: 'Rumah Tangga & Utilitas' },
+    { name: 'Satpam', month: '2026-05', status: 'Belum Dibayar', note: 'Rumah Tangga & Utilitas' },
+    { name: 'Kartu Kredit BRI', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
+    { name: 'Transfer Bapak', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
+    { name: 'Tahlilan Fatih', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
+    { name: 'Iuran Liqo', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
+    { name: 'Transfer Rek Mandiri Dik Nora', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
+    { name: 'Tring Pegadaian', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
+    { name: 'Iuran Bulanan Srandakan', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' }
   ]
 };
