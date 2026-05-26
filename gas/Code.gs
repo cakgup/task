@@ -193,6 +193,18 @@ function normalizeDateOnly(value, timezone) {
   return text;
 }
 
+function normalizeTaskTitle(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function duplicateTaskKey(date, child, title) {
+  return [
+    normalizeDateOnly(date, Session.getScriptTimeZone()),
+    String(child || '').trim().toLowerCase(),
+    normalizeTaskTitle(title)
+  ].join('|');
+}
+
 function dateValue(value, timezone) {
   if (value instanceof Date) return Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
   return value;
@@ -263,6 +275,8 @@ function getTaskRowsForSummary() {
   var rows = [];
   var row;
   var obj;
+  var seen = {};
+  var key;
   var i;
 
   if (values.length <= 1) return rows;
@@ -282,6 +296,9 @@ function getTaskRowsForSummary() {
       catatan: row[map.catatan] || '',
       deskripsi: row[map.deskripsi] || ''
     };
+    key = duplicateTaskKey(obj.tanggalTugas, obj.namaAnak, row[map.judul]);
+    if (seen[key]) continue;
+    seen[key] = true;
     rows.push(obj);
   }
 
@@ -295,7 +312,9 @@ function getTasks(params) {
   var status = params.status || '';
   var rows = getTaskObjects();
   var data = [];
+  var seen = {};
   var task;
+  var key;
   var i;
 
   for (i = 0; i < rows.length; i++) {
@@ -303,6 +322,9 @@ function getTasks(params) {
     if (date && task.tanggalTugas !== date) continue;
     if (child && child !== 'all' && task.namaAnak !== child) continue;
     if (status && status !== 'all' && task.status !== status) continue;
+    key = duplicateTaskKey(task.tanggalTugas, task.namaAnak, task.judul);
+    if (seen[key]) continue;
+    seen[key] = true;
     data.push(task);
   }
 
@@ -398,9 +420,49 @@ function findRowById(sheet, id) {
   return -1;
 }
 
+function findDuplicateDailyTaskRow(sheet, task, ignoreId) {
+  var values = sheetValues(sheet);
+  var headers;
+  var map;
+  var timezone;
+  var targetKey;
+  var row;
+  var rowId;
+  var rowKey;
+  var i;
+
+  if (values.length <= 1) return -1;
+
+  headers = values.shift();
+  map = headerMap(headers);
+  timezone = Session.getScriptTimeZone();
+  targetKey = duplicateTaskKey(task.tanggalTugas, task.namaAnak, task.judul);
+
+  for (i = 0; i < values.length; i++) {
+    row = values[i];
+    if (!isRowFilled(row)) continue;
+    rowId = String(row[map.id] || '');
+    if (ignoreId && rowId === String(ignoreId)) continue;
+    rowKey = duplicateTaskKey(row[map.tanggalTugas], row[map.namaAnak], row[map.judul]);
+    if (rowKey === targetKey) return i + 2;
+  }
+
+  return -1;
+}
+
 function addTask(task) {
   var sheet = getTaskSheet();
+  var duplicateRow = findDuplicateDailyTaskRow(sheet, task, task.id);
   var id = task.id || ('tsk-' + new Date().getTime());
+
+  if (duplicateRow > 0) {
+    return jsonResponse({
+      success: true,
+      duplicate: true,
+      message: 'Tugas harian sudah ada, tidak dibuat ulang.',
+      id: sheet.getRange(duplicateRow, 1).getValue()
+    });
+  }
 
   sheet.appendRow([
     id,
@@ -425,8 +487,18 @@ function updateTask(task) {
   var sheet = getTaskSheet();
   var row = findRowById(sheet, task.id);
   var tanggalInput = task.tanggalInput || new Date();
+  var duplicateRow;
 
   if (row < 0) return addTask(task);
+
+  duplicateRow = findDuplicateDailyTaskRow(sheet, task, task.id);
+  if (duplicateRow > 0) {
+    return jsonResponse({
+      success: false,
+      duplicate: true,
+      message: 'Tugas harian dengan nama yang sama sudah ada untuk anak dan tanggal tersebut.'
+    });
+  }
 
   sheet.getRange(row, 1, 1, 13).setValues([[
     task.id,

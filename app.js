@@ -404,9 +404,22 @@ function dailyTaskKey(task) {
   return [
     normalizeDateOnly(task.tanggalTugas),
     normalizeChildName(task.namaAnak || task.child),
-    task.judul || task.title,
-    task.beban || task.load || legacyTaskLoad(task)
+    String(task.judul || task.title || '').trim().replace(/\s+/g, ' ')
   ].join('|').toLowerCase();
+}
+
+function uniqueDailyTasks(rows) {
+  const seen = new Set();
+  const unique = [];
+
+  rows.forEach((task) => {
+    const key = dailyTaskKey(task);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    unique.push(task);
+  });
+
+  return unique;
 }
 
 function createDailyTask(template) {
@@ -433,13 +446,18 @@ async function ensureDailyTasks() {
   if (($('filterTaskDate')?.value || today()) !== today()) return;
 
   const existingKeys = new Set(tasks.map(dailyTaskKey));
-  const missingTasks = templates
-    .map(createDailyTask)
-    .filter((task) => !existingKeys.has(dailyTaskKey(task)));
+  const missingTasks = [];
+
+  templates.map(createDailyTask).forEach((task) => {
+    const key = dailyTaskKey(task);
+    if (existingKeys.has(key)) return;
+    existingKeys.add(key);
+    missingTasks.push(task);
+  });
 
   if (!missingTasks.length) return;
 
-  tasks = [...missingTasks, ...tasks];
+  tasks = uniqueDailyTasks([...missingTasks, ...tasks]);
   cacheTaskRows(tasks);
 
   await Promise.all(missingTasks.map((task) => sendToGas('addTask', { task })));
@@ -506,7 +524,7 @@ async function loadTasks() {
       const response = await fetch(`${cfg.GAS_URL}?action=getTasks&date=${encodeURIComponent(filterDate)}&ts=${Date.now()}`);
       const json = await response.json();
       const rows = Array.isArray(json) ? json : (json.data || []);
-      tasks = rows.map(normalizeTask).filter((task) => task.id && task.judul);
+      tasks = uniqueDailyTasks(rows.map(normalizeTask).filter((task) => task.id && task.judul));
       cacheTaskRows(tasks);
       await ensureDailyTasks();
       await loadTaskSummary();
