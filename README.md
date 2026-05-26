@@ -1,11 +1,11 @@
-# CakGup Tugas Keluarga
+# Manajemen Tugas Keluarga
 
 Paket ini sudah dikompilasi ulang untuk GitHub Pages + Google Apps Script.
 
 ## API GAS yang dipakai
 
 ```javascript
-https://script.google.com/macros/s/AKfycbzMdDmG4O_BQziOReBa3L2rgZ7waIWIifsqTZFbtx-j-xk7aXr_fp4JSMyjFFnCbrXM/exec
+https://script.google.com/macros/s/SCRIPT_ID/exec
 ```
 
 URL tersebut sudah dimasukkan ke `config.js`.
@@ -42,24 +42,3 @@ URL tersebut sudah dimasukkan ke `config.js`.
 9. Deploy.
 10. Pastikan URL hasil deploy sama dengan URL API di atas.
 
-## Cara test API
-
-Buka:
-
-```text
-https://script.google.com/macros/s/AKfycbzMdDmG4O_BQziOReBa3L2rgZ7waIWIifsqTZFbtx-j-xk7aXr_fp4JSMyjFFnCbrXM/exec?action=getTasks
-```
-
-Jika benar, akan muncul JSON seperti:
-
-```json
-{"success":true,"data":[]}
-```
-
-## Login aplikasi
-
-Password/kode masuk:
-
-```text
-cakgup
-```
