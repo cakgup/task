@@ -10,6 +10,8 @@ let bills = [];
 let activeTab = 'dashboard';
 let activeDate = null;
 let dailyRefreshTimer = null;
+let taskSummary = { stats: { total: 0, done: 0, pending: 0 }, children: {} };
+let pointRedemptions = [];
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
@@ -36,6 +38,60 @@ function normalizeChildName(name) {
 
 function normalizeStatus(status) {
   return status === 'Proses' ? 'Dikerjakan' : (status || 'Belum');
+}
+
+function readCachedTasks() {
+  return JSON.parse(localStorage.getItem('cakgupTasks') || '[]').map(normalizeTask);
+}
+
+function cacheTaskRows(rows) {
+  const map = new Map(readCachedTasks().map((task) => [task.id, task]));
+  rows.map(normalizeTask).forEach((task) => {
+    if (task.id) map.set(task.id, task);
+  });
+  const cached = Array.from(map.values());
+  localStorage.setItem('cakgupTasks', JSON.stringify(cached));
+  return cached;
+}
+
+function tasksForDate(date) {
+  return readCachedTasks().filter((task) => task.tanggalTugas === date);
+}
+
+function readPointRedemptions() {
+  return JSON.parse(localStorage.getItem('cakgupPointRedemptions') || '[]');
+}
+
+function savePointRedemptions() {
+  localStorage.setItem('cakgupPointRedemptions', JSON.stringify(pointRedemptions));
+}
+
+function redeemedPointsByChild() {
+  return pointRedemptions.reduce((totals, item) => {
+    const name = item.namaAnak || '';
+    if (!name) return totals;
+    totals[name] = (totals[name] || 0) + Number(item.points || 0);
+    return totals;
+  }, {});
+}
+
+function applyLocalRedemptions(summary) {
+  pointRedemptions = readPointRedemptions();
+  const redeemed = redeemedPointsByChild();
+  const next = {
+    stats: summary.stats || { total: 0, done: 0, pending: 0 },
+    children: { ...(summary.children || {}) }
+  };
+
+  Object.keys(next.children).forEach((name) => {
+    const child = { ...next.children[name] };
+    child.earnedPoints = child.earnedPoints ?? child.points ?? 0;
+    child.redeemedPoints = child.redeemedPoints ?? redeemed[name] ?? 0;
+    child.points = Math.max(0, child.earnedPoints - child.redeemedPoints);
+    next.children[name] = child;
+  });
+
+  return next;
 }
 
 const fallbackPrayerTimes = [
@@ -172,6 +228,7 @@ function bindEvents() {
   $('refreshBtn').onclick = loadTasks;
   $('refreshBillsBtn').onclick = loadBills;
   $('filterChild').onchange = render;
+  $('filterTaskDate').onchange = () => loadTasks();
   $('filterStatus').onchange = render;
   $('filterBillMonth').onchange = renderBills;
   $('filterBillStatus').onchange = renderBills;
@@ -181,11 +238,13 @@ function bindEvents() {
   $('billForm').addEventListener('submit', saveBill);
   $('resetBillForm').onclick = resetBillForm;
   $('childrenSummary').onclick = (event) => {
+    if (event.target.closest('[data-redeem-child]')) return;
     const card = event.target.closest('[data-child-name]');
     if (!card) return;
     showChildTasks(card.dataset.childName);
   };
   $('childrenSummary').onkeydown = (event) => {
+    if (event.target.closest('[data-redeem-child]')) return;
     if (!['Enter', ' '].includes(event.key)) return;
     const card = event.target.closest('[data-child-name]');
     if (!card) return;
@@ -211,6 +270,7 @@ function showApp() {
   $('app').hidden = false;
   activeDate = today();
   $('taskDate').value = today();
+  $('filterTaskDate').value = today();
   resetBillForm();
   loadTasks();
   loadBills();
@@ -227,6 +287,7 @@ function startDailyTaskRefresh() {
     const previousMonth = activeDate?.slice(0, 7);
     activeDate = currentDate;
     $('taskDate').value = currentDate;
+    $('filterTaskDate').value = currentDate;
 
     await loadTasks();
     if (currentDate.slice(0, 7) !== previousMonth) {
@@ -251,8 +312,46 @@ function openTab(id) {
 
 function showChildTasks(childName) {
   $('filterChild').value = childName;
+  $('filterTaskDate').value = today();
   $('filterStatus').value = 'all';
   openTab('tasks');
+  loadTasks();
+}
+
+async function redeemChildPoints(childName) {
+  const summary = taskSummary.children?.[childName] || { points: 0 };
+  const points = Number(summary.points || 0);
+
+  if (points <= 0) {
+    setStatus(`${childName} belum punya poin yang bisa dicairkan.`);
+    return;
+  }
+
+  if (!confirm(`Cairkan ${points} poin milik ${childName}?`)) return;
+
+  const redemption = {
+    id: `rdm-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    tanggal: new Date().toISOString(),
+    namaAnak: childName,
+    points,
+    catatan: 'Poin dicairkan'
+  };
+
+  pointRedemptions = [redemption, ...readPointRedemptions()];
+  savePointRedemptions();
+
+  if (!taskSummary.children) taskSummary.children = {};
+  const current = taskSummary.children[childName] || {};
+  taskSummary.children[childName] = {
+    ...current,
+    earnedPoints: current.earnedPoints ?? current.points ?? points,
+    redeemedPoints: Number(current.redeemedPoints || 0) + points,
+    points: 0
+  };
+
+  renderDashboard();
+  await sendToGas('redeemPoints', redemption);
+  setStatus(`${points} poin ${childName} sudah dicairkan.`);
 }
 
 function setStatus(message) {
@@ -331,6 +430,7 @@ function createDailyTask(template) {
 async function ensureDailyTasks() {
   const templates = Array.isArray(cfg.DAILY_TASKS) ? cfg.DAILY_TASKS : [];
   if (!templates.length) return;
+  if (($('filterTaskDate')?.value || today()) !== today()) return;
 
   const existingKeys = new Set(tasks.map(dailyTaskKey));
   const missingTasks = templates
@@ -340,31 +440,87 @@ async function ensureDailyTasks() {
   if (!missingTasks.length) return;
 
   tasks = [...missingTasks, ...tasks];
-  localStorage.setItem('cakgupTasks', JSON.stringify(tasks));
+  cacheTaskRows(tasks);
 
   await Promise.all(missingTasks.map((task) => sendToGas('addTask', { task })));
   setStatus(`${missingTasks.length} tugas harian dibuat otomatis untuk hari ini.`);
 }
-async function loadTasks() {
-  setStatus('Mengambil data dari Google Sheet...');
+
+function computeTaskSummaryFromCache(date = today()) {
+  const cached = readCachedTasks();
+  const daily = cached.filter((task) => task.tanggalTugas === date);
+  const children = {};
+
+  cached.forEach((task) => {
+    const name = task.namaAnak || '';
+    if (!name) return;
+    if (!children[name]) children[name] = { total: 0, done: 0, points: 0 };
+
+    children[name].total += 1;
+    if (task.status === 'Selesai') {
+      children[name].done += 1;
+      children[name].points += taskPoints(task);
+    }
+  });
+
+  return {
+    stats: {
+      total: daily.length,
+      done: daily.filter((task) => task.status === 'Selesai').length,
+      pending: daily.filter((task) => ['Belum', 'Dikerjakan'].includes(task.status)).length
+    },
+    children
+  };
+}
+
+async function loadTaskSummary() {
+  const date = today();
+  pointRedemptions = readPointRedemptions();
 
   try {
     if (cfg.GAS_URL) {
-      const response = await fetch(`${cfg.GAS_URL}?action=getTasks&ts=${Date.now()}`);
+      const response = await fetch(`${cfg.GAS_URL}?action=getTaskSummary&date=${encodeURIComponent(date)}&ts=${Date.now()}`);
+      const json = await response.json();
+      if (json.success === false) throw new Error(json.message || 'Gagal membaca ringkasan tugas');
+      const summary = {
+        stats: json.stats || { total: 0, done: 0, pending: 0 },
+        children: json.children || {}
+      };
+      taskSummary = json.redemptionsIncluded ? summary : applyLocalRedemptions(summary);
+      return;
+    }
+  } catch (error) {
+    console.warn('Gagal membaca ringkasan tugas:', error);
+  }
+
+  taskSummary = applyLocalRedemptions(computeTaskSummaryFromCache(date));
+}
+
+async function loadTasks() {
+  setStatus('Mengambil data dari Google Sheet...');
+  const filterDate = $('filterTaskDate')?.value || today();
+
+  try {
+    if (cfg.GAS_URL) {
+      await loadTaskSummary();
+      const response = await fetch(`${cfg.GAS_URL}?action=getTasks&date=${encodeURIComponent(filterDate)}&ts=${Date.now()}`);
       const json = await response.json();
       const rows = Array.isArray(json) ? json : (json.data || []);
       tasks = rows.map(normalizeTask).filter((task) => task.id && task.judul);
-      localStorage.setItem('cakgupTasks', JSON.stringify(tasks));
+      cacheTaskRows(tasks);
       await ensureDailyTasks();
+      await loadTaskSummary();
       setStatus('Data tersinkron dengan Google Sheet.');
     } else {
-      tasks = JSON.parse(localStorage.getItem('cakgupTasks') || '[]').map(normalizeTask);
+      tasks = tasksForDate(filterDate);
       await ensureDailyTasks();
+      taskSummary = applyLocalRedemptions(computeTaskSummaryFromCache());
       setStatus('Mode lokal aktif. Sinkronisasi belum diatur.');
     }
   } catch (error) {
-    tasks = JSON.parse(localStorage.getItem('cakgupTasks') || '[]').map(normalizeTask);
+    tasks = tasksForDate(filterDate);
     await ensureDailyTasks();
+    taskSummary = applyLocalRedemptions(computeTaskSummaryFromCache());
     setStatus('Gagal membaca GAS. Sementara memakai data lokal di HP ini.');
   }
 
@@ -388,7 +544,8 @@ async function sendToGas(action, payload) {
 }
 
 async function persist(action, payload) {
-  localStorage.setItem('cakgupTasks', JSON.stringify(tasks));
+  cacheTaskRows(tasks);
+  taskSummary = applyLocalRedemptions(computeTaskSummaryFromCache());
   await sendToGas(action, payload);
 }
 
@@ -406,11 +563,11 @@ async function saveTask(e) {
     deskripsi: $('description').value,
     kategori: $('category').value,
     tanggalTugas: $('taskDate').value,
-    jamTarget: $('targetTime').value,
-    prioritas: $('priority').value,
+    jamTarget: old?.jamTarget || '',
+    prioritas: old?.prioritas || 'Normal',
     status: old?.status || 'Belum',
     waktuSelesai: old?.waktuSelesai || '',
-    catatan: $('note').value,
+    catatan: old?.catatan || '',
     beban: Number($('load').value || 1)
   });
 
@@ -466,11 +623,8 @@ function editTask(id) {
   $('child').value = task.namaAnak;
   $('category').value = task.kategori;
   $('taskDate').value = task.tanggalTugas;
-  $('targetTime').value = task.jamTarget;
-  $('priority').value = task.prioritas;
   $('load').value = taskLoad(task);
   $('description').value = task.deskripsi;
-  $('note').value = task.catatan;
 
   openTab('add');
 }
@@ -720,27 +874,26 @@ function billCard(bill) {
 }
 
 function renderDashboard() {
-  const todays = tasks.filter((task) => task.tanggalTugas === today());
+  const stats = taskSummary.stats || { total: 0, done: 0, pending: 0 };
+  const summaries = taskSummary.children || {};
 
-  $('statTotal').textContent = todays.length;
-  $('statDone').textContent = todays.filter((task) => task.status === 'Selesai').length;
-  $('statPending').textContent = todays.filter((task) => ['Belum', 'Dikerjakan'].includes(task.status)).length;
-  $('statLate').textContent = todays.filter((task) => task.status === 'Terlambat').length;
+  $('statTotal').textContent = stats.total || 0;
+  $('statDone').textContent = stats.done || 0;
+  $('statPending').textContent = stats.pending || 0;
 
   $('childrenSummary').innerHTML = cfg.CHILDREN.map((child) => {
-    const arr = tasks.filter((task) => task.namaAnak === child.name);
-    const done = arr.filter((task) => task.status === 'Selesai').length;
-    const points = arr
-      .filter((task) => task.status === 'Selesai')
-      .reduce((total, task) => total + taskPoints(task), 0);
-    const pct = arr.length ? Math.round(done / arr.length * 100) : 0;
+    const summary = summaries[child.name] || { total: 0, done: 0, points: 0 };
+    const pct = summary.total ? Math.round(summary.done / summary.total * 100) : 0;
 
     return `<article class="child-card child-card-button" data-child-name="${escapeHtml(child.name)}" tabindex="0" role="button" aria-label="Lihat tugas ${escapeHtml(child.name)}">
       <div class="child-card-head">
         <h3>${escapeHtml(child.name)}</h3>
-        <strong class="points-badge">Total ${points} poin</strong>
+        <div class="child-point-actions">
+          <strong class="points-badge">Total ${summary.points || 0} poin</strong>
+          <button class="redeem-btn" data-redeem-child="${escapeHtml(child.name)}" onclick="redeemChildPoints('${escapeHtml(child.name)}')">Cairkan</button>
+        </div>
       </div>
-      <p>${escapeHtml(child.school)} · Semua tugas: ${done}/${arr.length} selesai</p>
+      <p>${escapeHtml(child.school)} · Semua tugas: ${summary.done || 0}/${summary.total || 0} selesai</p>
       <div class="progress"><span style="width:${pct}%"></span></div>
     </article>`;
   }).join('');
@@ -763,6 +916,9 @@ function card(task) {
   const description = task.deskripsi && !isLegacyLoadText(task.deskripsi)
     ? `<span>${escapeHtml(task.deskripsi)}</span>`
     : '';
+  const isDone = task.status === 'Selesai';
+  const actionStatus = isDone ? 'Belum' : 'Selesai';
+  const actionLabel = isDone ? 'Cancel' : 'Selesai';
 
   return `<article class="task-card chore-card">
     <h3>${escapeHtml(task.judul)}</h3>
@@ -773,25 +929,29 @@ function card(task) {
     </p>
     <div class="meta">
       <span class="pill">${escapeHtml(task.namaAnak)}</span>
-      <span class="pill">${escapeHtml(task.kategori)}</span>
       <span class="pill">${escapeHtml(task.tanggalTugas)} ${escapeHtml(task.jamTarget || '')}</span>
       <span class="pill status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span>
-      <span class="pill">${escapeHtml(task.prioritas)}</span>
-    </div>
-    <div class="actions chore-actions">
-      <button onclick="setTaskStatus('${safeId}','Selesai')">Selesai</button>
-      <button class="icon-btn" onclick="editTask('${safeId}')" aria-label="Edit tugas" title="Edit">&#9998;</button>
-      <button class="icon-btn danger" onclick="delTask('${safeId}')" aria-label="Hapus tugas" title="Hapus">&#10005;</button>
+      <div class="actions chore-actions">
+        <button onclick="setTaskStatus('${safeId}','${actionStatus}')">${actionLabel}</button>
+        <button class="icon-btn" onclick="editTask('${safeId}')" aria-label="Edit tugas" title="Edit">&#9998;</button>
+        <button class="icon-btn danger" onclick="delTask('${safeId}')" aria-label="Hapus tugas" title="Hapus">&#10005;</button>
+      </div>
     </div>
   </article>`;
 }
 
 function renderTasks() {
   const fc = $('filterChild').value;
+  const fd = $('filterTaskDate').value || today();
   const fs = $('filterStatus').value;
 
   const list = tasks
-    .filter((task) => (fc === 'all' || task.namaAnak === fc) && (fs === 'all' || task.status === fs))
+    .filter((task) => {
+      const childMatches = fc === 'all' || task.namaAnak === fc;
+      const dateMatches = task.tanggalTugas === fd;
+      const statusMatches = fs === 'all' || task.status === fs;
+      return childMatches && dateMatches && statusMatches;
+    })
     .sort((a, b) => `${a.tanggalTugas || ''}${a.jamTarget || ''}`.localeCompare(`${b.tanggalTugas || ''}${b.jamTarget || ''}`));
 
   $('taskList').innerHTML = list.length

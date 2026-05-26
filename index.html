@@ -49,9 +49,12 @@
   <main id="app" class="app" hidden>
     <header class="hero">
       <div>
-        <p class="eyebrow">Tugas Keluarga</p>
+        <div class="hero-topline">
+          <p class="eyebrow">Tugas Keluarga</p>
+          <p id="todayLabel" class="hero-date">Memuat tanggal...</p>
+        </div>
         <h1>Semangat!</h1>
-        <p id="todayLabel">Memuat tanggal...</p>
+        <p class="hero-motivation">Tugasmu hari ini adalah langkah kecil menuju impian besarmu esok hari.</p>
       </div>
       <button id="logoutBtn" class="icon-btn">Keluar</button>
     </header>
@@ -70,10 +73,15 @@
         <article class="stat-card"><span id="statTotal">0</span><small>Total Hari Ini</small></article>
         <article class="stat-card"><span id="statDone">0</span><small>Selesai</small></article>
         <article class="stat-card"><span id="statPending">0</span><small>Belum/Dikerjakan</small></article>
-        <article class="stat-card"><span id="statLate">0</span><small>Terlambat</small></article>
       </div>
-      <h2>Rekap Anak</h2>
+      <div class="children-heading">
+        <h2>Yuk kumpulkan point!</h2>
+        <p>klik nama masing - masing untuk cek penugasan harian ya..</p>
+      </div>
       <div id="childrenSummary" class="children-summary"></div>
+      <p class="children-encouragement">
+        Lakukanlah yang terbaik dalam setiap tugasmu, karena Allah mencintai orang yang bersungguh-sungguh. Semangat mengumpulkan poin untuk pencapaianmu di akhir bulan!
+      </p>
     </section>
 
     <section id="add" class="panel">
@@ -95,22 +103,11 @@
                 <option>Lainnya</option>
               </select>
             </label>
-            <div class="form-row">
-              <label>Tanggal<input id="taskDate" type="date" required /></label>
-              <label>Jam Target<input id="targetTime" type="time" /></label>
-            </div>
-            <label>Prioritas
-              <select id="priority">
-                <option>Normal</option>
-                <option>Tinggi</option>
-                <option>Rendah</option>
-              </select>
-            </label>
+            <label>Tanggal<input id="taskDate" type="date" required /></label>
             <label>Beban
               <input id="load" type="number" min="1" step="1" value="1" required placeholder="Contoh: 2" />
             </label>
             <label>Deskripsi<textarea id="description" rows="3" placeholder="Catatan singkat tugas"></textarea></label>
-            <label>Catatan<textarea id="note" rows="2" placeholder="Opsional"></textarea></label>
             <button type="submit" class="primary">Simpan Tugas</button>
             <button type="button" id="resetForm" class="secondary">Kosongkan</button>
           </form>
@@ -140,9 +137,11 @@
       </div>
       <div class="filters">
         <select id="filterChild"><option value="all">Semua Anak</option></select>
+        <input id="filterTaskDate" type="date" aria-label="Filter tanggal tugas" />
         <select id="filterStatus">
           <option value="all">Semua Status</option>
-          <option>Belum</option><option>Dikerjakan</option><option>Selesai</option><option>Terlambat</option>
+          <option>Belum</option>
+          <option>Selesai</option>
         </select>
       </div>
       <div id="taskList" class="task-list"></div>

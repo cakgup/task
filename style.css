@@ -247,13 +247,33 @@ button[type="submit"], .primary {
   margin-bottom: 14px;
   background: rgba(255,255,255,.95);
 }
-.hero .eyebrow { margin-bottom: 10px; }
+.hero-topline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.hero .eyebrow { margin: 0; }
+.hero-date {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 850;
+}
 .hero h1 {
   color: var(--blue-3);
   font-size: clamp(30px, 4.6vw, 54px);
   text-shadow: none;
 }
-.hero p { margin: 8px 0 0; color: var(--muted); font-weight: 700; }
+.hero-motivation {
+  max-width: 620px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: clamp(14px, 2vw, 17px);
+  font-weight: 750;
+  line-height: 1.45;
+}
 .icon-btn, .small-btn { color: var(--blue); background: var(--yellow); white-space: nowrap; }
 
 .tabs {
@@ -293,7 +313,7 @@ button[type="submit"], .primary {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -369,6 +389,51 @@ button[type="submit"], .primary {
   white-space: nowrap;
   box-shadow: 0 8px 18px rgba(255, 202, 26, .24);
 }
+.child-point-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  transform: translateX(-12px);
+}
+.redeem-btn {
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--blue);
+  background: #edf3fb;
+  font-size: 12px;
+  box-shadow: none;
+}
+.redeem-btn:hover,
+.redeem-btn:focus-visible {
+  background: #dfe9f8;
+}
+.children-heading {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+}
+.children-heading h2 {
+  margin: 0;
+}
+.children-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+.children-encouragement {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  color: rgba(255,255,255,.9);
+  background: rgba(8, 25, 50, .36);
+  border: 1px solid rgba(255, 202, 26, .22);
+  border-radius: 18px;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.55;
+}
 .child-card-button {
   cursor: pointer;
   transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
@@ -384,6 +449,8 @@ button[type="submit"], .primary {
 .progress span { display: block; height: 100%; background: var(--yellow); }
 
 .form-row, .filters { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bill-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
 .form-stack {
   display: grid;
@@ -403,6 +470,7 @@ button[type="submit"], .primary {
 .meta { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0; }
 .pill { border-radius: 999px; padding: 6px 10px; background: #edf3fb; color: #455873; font-size: 12px; font-weight: 850; }
 .status-Selesai { background: #dff1e6; color: var(--success); }
+.status-Belum { background: #fff0cc; color: var(--warning); }
 .status-Terlambat { background: #f8dfd9; color: var(--danger); }
 .status-Dikerjakan { background: #fff0cc; color: var(--warning); }
 .status-Sudah-Dibayar { background: #dff1e6; color: var(--success); }
@@ -412,7 +480,7 @@ button[type="submit"], .primary {
 .actions button.danger { color: var(--danger); background: #f6e2de; }
 .chore-card {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   padding: 13px 14px;
 }
 .chore-card h3 {
@@ -420,19 +488,23 @@ button[type="submit"], .primary {
 }
 .chore-card .meta {
   margin: 0;
+  align-items: center;
 }
 .chore-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 2px;
+  flex: 1 1 240px;
+  justify-content: flex-end;
+  margin: 0 0 0 auto;
 }
 .chore-actions button {
   min-height: 34px;
   border-radius: 16px;
 }
 .chore-actions button:first-child {
-  flex: 1 1 auto;
+  flex: 0 1 220px;
+  min-width: 110px;
 }
 .chore-actions .icon-btn {
   display: inline-grid;
@@ -551,7 +623,17 @@ button[type="submit"], .primary {
   .login-copy { order: 1; }
   .login-card { order: 2; }
   .prayer-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stat-card {
+    min-height: 88px;
+    padding: 14px;
+  }
+  .stat-card span {
+    font-size: 34px;
+  }
+  .stat-card small {
+    font-size: 12px;
+  }
 }
 
 @media (max-width: 560px) {
@@ -564,6 +646,35 @@ button[type="submit"], .primary {
   .tabs button { font-size: 11px; padding-inline: 4px; }
   .form-row, .filters { grid-template-columns: 1fr; }
   .actions { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid {
+    gap: 8px;
+  }
+  .stat-card {
+    min-height: 76px;
+    padding: 10px;
+    border-radius: 14px;
+  }
+  .stat-card span {
+    font-size: 30px;
+  }
+  .stat-card small {
+    margin-top: 5px;
+    font-size: 10px;
+    line-height: 1.15;
+  }
+  .child-card-head {
+    align-items: flex-start;
+  }
+  .child-point-actions {
+    transform: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 48%;
+  }
+  .points-badge,
+  .redeem-btn {
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 360px) {

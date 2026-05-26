@@ -1,16 +1,25 @@
 const SHEET_NAME = 'tasks';
 const BILL_SHEET_NAME = 'bills';
+const REDEMPTION_SHEET_NAME = 'point_redemptions';
 
 function doGet(e) {
   e = e || { parameter: {} };
   const action = e.parameter.action || 'getTasks';
 
   if (action === 'getTasks' || action === 'list') {
-    return getTasks();
+    return getTasks(e.parameter || {});
+  }
+
+  if (action === 'getTaskSummary') {
+    return getTaskSummary(e.parameter || {});
   }
 
   if (action === 'getBills') {
     return getBills();
+  }
+
+  if (action === 'getPointRedemptions') {
+    return getPointRedemptions();
   }
 
   if (action === 'setup') {
@@ -35,6 +44,7 @@ function doPost(e) {
     if (action === 'updateBill') return updateBill(data.bill || data);
     if (action === 'updateBillStatus') return updateBillStatus(data);
     if (action === 'deleteBill') return deleteBill(data.id);
+    if (action === 'redeemPoints') return redeemPoints(data);
 
     return jsonResponse({ success: false, message: 'Action POST tidak dikenali', action });
   } catch (err) {
@@ -87,16 +97,39 @@ function setupSheet() {
   return jsonResponse({ success: true, message: 'Sheet tasks berhasil disiapkan.' });
 }
 
-function getTasks() {
+function normalizeDateOnly(value, timezone) {
+  if (!value) return '';
+  if (value instanceof Date) return Utilities.formatDate(value, timezone, 'yyyy-MM-dd');
+  const text = String(value).trim();
+  const match = text.match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : text;
+}
+
+function legacyTaskLoad(task) {
+  const text = String(task.catatan || task.deskripsi || '');
+  const match = text.match(/beban\s*:\s*(\d+)/i);
+  return match ? Number(match[1]) : 1;
+}
+
+function taskLoad(task) {
+  const load = Number(task.beban || task.load || 0);
+  return load > 0 ? load : legacyTaskLoad(task);
+}
+
+function taskPoints(task) {
+  return taskLoad(task) * 200;
+}
+
+function getTaskObjects() {
   const sheet = getSheet();
   const values = sheet.getDataRange().getValues();
 
-  if (values.length <= 1) return jsonResponse({ success: true, data: [] });
+  if (values.length <= 1) return [];
 
   const headers = values.shift();
   const timezone = Session.getScriptTimeZone();
 
-  const data = values
+  return values
     .filter(row => row.some(cell => String(cell || '').trim() !== ''))
     .map(row => {
       const obj = {};
@@ -108,10 +141,144 @@ function getTasks() {
         }
         obj[header] = value;
       });
+      obj.tanggalTugas = normalizeDateOnly(obj.tanggalTugas, timezone);
       return obj;
     });
+}
+
+function getTasks(params) {
+  params = params || {};
+  const date = params.date || '';
+  const child = params.child || '';
+  const status = params.status || '';
+
+  const data = getTaskObjects()
+    .filter(task => !date || task.tanggalTugas === date)
+    .filter(task => !child || child === 'all' || task.namaAnak === child)
+    .filter(task => !status || status === 'all' || task.status === status);
 
   return jsonResponse({ success: true, data });
+}
+
+function getTaskSummary(params) {
+  params = params || {};
+  const date = params.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const data = getTaskObjects();
+  const redeemed = getRedeemedPointTotals();
+  const daily = data.filter(task => task.tanggalTugas === date);
+  const children = {};
+
+  data.forEach(task => {
+    const name = task.namaAnak || '';
+    if (!name) return;
+    if (!children[name]) children[name] = { total: 0, done: 0, points: 0 };
+
+    children[name].total += 1;
+    if (task.status === 'Selesai') {
+      children[name].done += 1;
+      children[name].points += taskPoints(task);
+    }
+  });
+
+  Object.keys(children).forEach(name => {
+    children[name].earnedPoints = children[name].points;
+    children[name].redeemedPoints = redeemed[name] || 0;
+    children[name].points = Math.max(0, children[name].points - children[name].redeemedPoints);
+  });
+
+  return jsonResponse({
+    success: true,
+    date,
+    redemptionsIncluded: true,
+    stats: {
+      total: daily.length,
+      done: daily.filter(task => task.status === 'Selesai').length,
+      pending: daily.filter(task => ['Belum', 'Dikerjakan'].includes(task.status)).length
+    },
+    children
+  });
+}
+
+function getRedemptionHeaders() {
+  return ['id', 'tanggal', 'namaAnak', 'points', 'catatan'];
+}
+
+function getRedemptionSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(REDEMPTION_SHEET_NAME);
+
+  if (!sheet) sheet = ss.insertSheet(REDEMPTION_SHEET_NAME);
+
+  const headers = getRedemptionHeaders();
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  } else {
+    const existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
+    const isHeaderEmpty = existingHeaders.every(v => String(v || '').trim() === '');
+    if (isHeaderEmpty) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  return sheet;
+}
+
+function getPointRedemptionObjects() {
+  const sheet = getRedemptionSheet();
+  const values = sheet.getDataRange().getValues();
+
+  if (values.length <= 1) return [];
+
+  const headers = values.shift();
+  const timezone = Session.getScriptTimeZone();
+
+  return values
+    .filter(row => row.some(cell => String(cell || '').trim() !== ''))
+    .map(row => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        if (!header) return;
+        let value = row[index];
+        if (value instanceof Date) {
+          value = Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
+        }
+        obj[header] = value;
+      });
+      obj.points = Number(obj.points || 0);
+      return obj;
+    });
+}
+
+function getRedeemedPointTotals() {
+  return getPointRedemptionObjects().reduce((totals, item) => {
+    const name = item.namaAnak || '';
+    if (!name) return totals;
+    totals[name] = (totals[name] || 0) + Number(item.points || 0);
+    return totals;
+  }, {});
+}
+
+function getPointRedemptions() {
+  return jsonResponse({ success: true, data: getPointRedemptionObjects() });
+}
+
+function redeemPoints(data) {
+  const sheet = getRedemptionSheet();
+  const namaAnak = data.namaAnak || data.child || '';
+  const points = Number(data.points || 0);
+
+  if (!namaAnak || points <= 0) {
+    return jsonResponse({ success: false, message: 'Data pencairan poin tidak lengkap.' });
+  }
+
+  const id = data.id || ('rdm-' + Date.now());
+  sheet.appendRow([
+    id,
+    data.tanggal || new Date(),
+    namaAnak,
+    points,
+    data.catatan || 'Poin dicairkan'
+  ]);
+
+  return jsonResponse({ success: true, message: 'Poin berhasil dicairkan.', id });
 }
 
 function findRowById(sheet, id) {
