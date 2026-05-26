@@ -215,9 +215,24 @@ function rowToObject(headers, row, timezone) {
   return obj;
 }
 
+function headerMap(headers) {
+  var map = {};
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i]) map[headers[i]] = i;
+  }
+  return map;
+}
+
+function sheetValues(sheet) {
+  var lastRow = sheet.getLastRow();
+  var lastColumn = sheet.getLastColumn();
+  if (lastRow < 1 || lastColumn < 1) return [];
+  return sheet.getRange(1, 1, lastRow, lastColumn).getValues();
+}
+
 function getTaskObjects() {
   var sheet = getTaskSheet();
-  var values = sheet.getDataRange().getValues();
+  var values = sheetValues(sheet);
   var headers;
   var timezone;
   var data = [];
@@ -237,6 +252,40 @@ function getTaskObjects() {
   }
 
   return data;
+}
+
+function getTaskRowsForSummary() {
+  var sheet = getTaskSheet();
+  var values = sheetValues(sheet);
+  var headers;
+  var map;
+  var timezone;
+  var rows = [];
+  var row;
+  var obj;
+  var i;
+
+  if (values.length <= 1) return rows;
+
+  headers = values.shift();
+  map = headerMap(headers);
+  timezone = Session.getScriptTimeZone();
+
+  for (i = 0; i < values.length; i++) {
+    row = values[i];
+    if (!isRowFilled(row)) continue;
+    obj = {
+      namaAnak: row[map.namaAnak] || '',
+      status: row[map.status] || '',
+      tanggalTugas: normalizeDateOnly(row[map.tanggalTugas], timezone),
+      beban: row[map.beban] || '',
+      catatan: row[map.catatan] || '',
+      deskripsi: row[map.deskripsi] || ''
+    };
+    rows.push(obj);
+  }
+
+  return rows;
 }
 
 function getTasks(params) {
@@ -280,7 +329,7 @@ function taskPoints(task) {
 function getTaskSummary(params) {
   params = params || {};
   var date = params.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  var data = getTaskObjects();
+  var data = getTaskRowsForSummary();
   var redeemed = getRedeemedPointTotals();
   var children = {};
   var stats = { total: 0, done: 0, pending: 0 };
@@ -330,8 +379,17 @@ function getTaskSummary(params) {
 function findRowById(sheet, id) {
   var lastRow = sheet.getLastRow();
   var ids;
+  var found;
   var i;
   if (lastRow < 2) return -1;
+
+  if (sheet.getRange(2, 1, lastRow - 1, 1).createTextFinder) {
+    found = sheet.getRange(2, 1, lastRow - 1, 1)
+      .createTextFinder(String(id))
+      .matchEntireCell(true)
+      .findNext();
+    if (found) return found.getRow();
+  }
 
   ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
   for (i = 0; i < ids.length; i++) {
@@ -366,12 +424,13 @@ function addTask(task) {
 function updateTask(task) {
   var sheet = getTaskSheet();
   var row = findRowById(sheet, task.id);
+  var tanggalInput = task.tanggalInput || new Date();
 
   if (row < 0) return addTask(task);
 
   sheet.getRange(row, 1, 1, 13).setValues([[
     task.id,
-    task.tanggalInput || sheet.getRange(row, 2).getValue() || new Date(),
+    tanggalInput,
     task.namaAnak || '',
     task.judul || '',
     task.deskripsi || '',
@@ -391,15 +450,14 @@ function updateTask(task) {
 function updateStatus(data) {
   var sheet = getTaskSheet();
   var row = findRowById(sheet, data.id);
+  var waktuSelesai = '';
 
   if (row < 0) return jsonResponse({ success: false, message: 'Tugas tidak ditemukan.' });
 
-  sheet.getRange(row, 10).setValue(data.status || 'Belum');
   if (data.status === 'Selesai') {
-    sheet.getRange(row, 11).setValue(data.waktuSelesai || new Date());
-  } else {
-    sheet.getRange(row, 11).setValue('');
+    waktuSelesai = data.waktuSelesai || new Date();
   }
+  sheet.getRange(row, 10, 1, 2).setValues([[data.status || 'Belum', waktuSelesai]]);
 
   return jsonResponse({ success: true, message: 'Status tugas berhasil diperbarui.' });
 }
@@ -416,7 +474,7 @@ function deleteTask(id) {
 
 function getPointRedemptionObjects() {
   var sheet = getRedemptionSheet();
-  var values = sheet.getDataRange().getValues();
+  var values = sheetValues(sheet);
   var headers;
   var timezone;
   var data = [];
@@ -481,7 +539,7 @@ function redeemPoints(data) {
 
 function getBills() {
   var sheet = getBillSheet();
-  var values = sheet.getDataRange().getValues();
+  var values = sheetValues(sheet);
   var headers;
   var timezone;
   var data = [];
@@ -524,12 +582,13 @@ function addBill(bill) {
 function updateBill(bill) {
   var sheet = getBillSheet();
   var row = findRowById(sheet, bill.id);
+  var tanggalInput = bill.tanggalInput || new Date();
 
   if (row < 0) return addBill(bill);
 
   sheet.getRange(row, 1, 1, 9).setValues([[
     bill.id,
-    bill.tanggalInput || sheet.getRange(row, 2).getValue() || new Date(),
+    tanggalInput,
     bill.nama || '',
     Number(bill.jumlah || 0),
     bill.bulan || '',
@@ -563,8 +622,7 @@ function updateBillStatus(data) {
     waktuBayar = data.waktuBayar || new Date();
   }
 
-  sheet.getRange(row, 7).setValue(status);
-  sheet.getRange(row, 8).setValue(waktuBayar);
+  sheet.getRange(row, 7, 1, 2).setValues([[status, waktuBayar]]);
 
   return jsonResponse({ success: true, message: 'Status tagihan berhasil diperbarui.' });
 }
