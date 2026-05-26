@@ -728,10 +728,9 @@ function renderDashboard() {
   $('statLate').textContent = todays.filter((task) => task.status === 'Terlambat').length;
 
   $('childrenSummary').innerHTML = cfg.CHILDREN.map((child) => {
-    const arr = todays.filter((task) => task.namaAnak === child.name);
+    const arr = tasks.filter((task) => task.namaAnak === child.name);
     const done = arr.filter((task) => task.status === 'Selesai').length;
-    const points = tasks
-      .filter((task) => task.namaAnak === child.name)
+    const points = arr
       .filter((task) => task.status === 'Selesai')
       .reduce((total, task) => total + taskPoints(task), 0);
     const pct = arr.length ? Math.round(done / arr.length * 100) : 0;
@@ -741,7 +740,7 @@ function renderDashboard() {
         <h3>${escapeHtml(child.name)}</h3>
         <strong class="points-badge">Total ${points} poin</strong>
       </div>
-      <p>${escapeHtml(child.school)} · ${done}/${arr.length} selesai</p>
+      <p>${escapeHtml(child.school)} · Semua tugas: ${done}/${arr.length} selesai</p>
       <div class="progress"><span style="width:${pct}%"></span></div>
     </article>`;
   }).join('');
