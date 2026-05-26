@@ -51,7 +51,7 @@ function jsonResponse(obj) {
 function getHeaders() {
   return [
     'id', 'tanggalInput', 'namaAnak', 'judul', 'deskripsi', 'kategori',
-    'tanggalTugas', 'jamTarget', 'prioritas', 'status', 'waktuSelesai', 'catatan'
+    'tanggalTugas', 'jamTarget', 'prioritas', 'status', 'waktuSelesai', 'catatan', 'beban'
   ];
 }
 
@@ -68,7 +68,15 @@ function getSheet() {
   } else {
     const existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
     const isHeaderEmpty = existingHeaders.every(v => String(v || '').trim() === '');
-    if (isHeaderEmpty) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    if (isHeaderEmpty) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    } else {
+      headers.forEach(header => {
+        if (!existingHeaders.includes(header)) {
+          sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+        }
+      });
+    }
   }
 
   return sheet;
@@ -133,7 +141,8 @@ function addTask(task) {
     task.prioritas || 'Normal',
     task.status || 'Belum',
     task.waktuSelesai || '',
-    task.catatan || ''
+    task.catatan || '',
+    Number(task.beban || 1)
   ]);
 
   return jsonResponse({ success: true, message: 'Tugas berhasil ditambahkan.', id });
@@ -145,7 +154,7 @@ function updateTask(task) {
 
   if (row < 0) return addTask(task);
 
-  sheet.getRange(row, 1, 1, 12).setValues([[
+  sheet.getRange(row, 1, 1, 13).setValues([[
     task.id,
     task.tanggalInput || sheet.getRange(row, 2).getValue() || new Date(),
     task.namaAnak || '',
@@ -157,7 +166,8 @@ function updateTask(task) {
     task.prioritas || 'Normal',
     task.status || 'Belum',
     task.waktuSelesai || '',
-    task.catatan || ''
+    task.catatan || '',
+    Number(task.beban || 1)
   ]]);
 
   return jsonResponse({ success: true, message: 'Tugas berhasil diperbarui.' });

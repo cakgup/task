@@ -8,14 +8,11 @@ const cfg = getConfig();
 let tasks = [];
 let bills = [];
 let activeTab = 'dashboard';
+let activeDate = null;
+let dailyRefreshTimer = null;
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
-const currency = new Intl.NumberFormat('id-ID', {
-  style: 'currency',
-  currency: 'IDR',
-  maximumFractionDigits: 0
-});
 
 function normalizeDateOnly(value) {
   if (!value) return today();
@@ -178,6 +175,9 @@ function bindEvents() {
   $('filterStatus').onchange = render;
   $('filterBillMonth').onchange = renderBills;
   $('filterBillStatus').onchange = renderBills;
+  document.querySelectorAll('[data-bill-filter]').forEach((button) => {
+    button.onclick = () => filterBillsByStatus(button.dataset.billFilter);
+  });
   $('billForm').addEventListener('submit', saveBill);
   $('resetBillForm').onclick = resetBillForm;
   $('childrenSummary').onclick = (event) => {
@@ -209,10 +209,30 @@ function fillChildren() {
 function showApp() {
   $('loginPage').hidden = true;
   $('app').hidden = false;
+  activeDate = today();
   $('taskDate').value = today();
   resetBillForm();
   loadTasks();
   loadBills();
+  startDailyTaskRefresh();
+}
+
+function startDailyTaskRefresh() {
+  if (dailyRefreshTimer) return;
+
+  dailyRefreshTimer = setInterval(async () => {
+    const currentDate = today();
+    if (currentDate === activeDate) return;
+
+    const previousMonth = activeDate?.slice(0, 7);
+    activeDate = currentDate;
+    $('taskDate').value = currentDate;
+
+    await loadTasks();
+    if (currentDate.slice(0, 7) !== previousMonth) {
+      await loadBills();
+    }
+  }, 60000);
 }
 
 function openTab(id) {
@@ -239,7 +259,13 @@ function setStatus(message) {
   $('syncStatus').textContent = message;
 }
 
+function filterBillsByStatus(status) {
+  $('filterBillStatus').value = status || 'all';
+  renderBills();
+}
+
 function normalizeTask(task) {
+  const legacyLoad = legacyTaskLoad(task);
   return {
     id: String(task.id || uid()),
     tanggalInput: task.tanggalInput || new Date().toISOString(),
@@ -252,8 +278,27 @@ function normalizeTask(task) {
     prioritas: task.prioritas || 'Normal',
     status: normalizeStatus(task.status),
     waktuSelesai: task.waktuSelesai || '',
-    catatan: task.catatan || ''
+    catatan: task.catatan || '',
+    beban: Number(task.beban || task.load || legacyLoad || 1)
   };
+}
+
+function legacyTaskLoad(task) {
+  const match = String(task.catatan || task.deskripsi || '').match(/beban\s*:\s*(\d+)/i);
+  return match ? Number(match[1]) : 1;
+}
+
+function taskLoad(task) {
+  const load = Number(task.beban || task.load || 0);
+  return load > 0 ? load : legacyTaskLoad(task);
+}
+
+function isLegacyLoadText(text) {
+  return /^beban\s*:\s*\d+$/i.test(String(text || '').trim());
+}
+
+function taskPoints(task) {
+  return taskLoad(task) * 200;
 }
 
 function dailyTaskKey(task) {
@@ -261,7 +306,7 @@ function dailyTaskKey(task) {
     normalizeDateOnly(task.tanggalTugas),
     normalizeChildName(task.namaAnak || task.child),
     task.judul || task.title,
-    task.catatan || (task.load ? `Beban: ${task.load}` : '')
+    task.beban || task.load || legacyTaskLoad(task)
   ].join('|').toLowerCase();
 }
 
@@ -271,14 +316,15 @@ function createDailyTask(template) {
     tanggalInput: new Date().toISOString(),
     namaAnak: template.child,
     judul: template.title,
-    deskripsi: template.description || `Beban: ${template.load}`,
+    deskripsi: template.description || '',
     kategori: template.category || 'Pekerjaan Rumah',
     tanggalTugas: today(),
     jamTarget: template.time || '',
     prioritas: template.priority || 'Normal',
     status: 'Belum',
     waktuSelesai: '',
-    catatan: `Beban: ${template.load}`
+    catatan: '',
+    beban: Number(template.load || 1)
   });
 }
 
@@ -364,7 +410,8 @@ async function saveTask(e) {
     prioritas: $('priority').value,
     status: old?.status || 'Belum',
     waktuSelesai: old?.waktuSelesai || '',
-    catatan: $('note').value
+    catatan: $('note').value,
+    beban: Number($('load').value || 1)
   });
 
   tasks = old
@@ -421,6 +468,7 @@ function editTask(id) {
   $('taskDate').value = task.tanggalTugas;
   $('targetTime').value = task.jamTarget;
   $('priority').value = task.prioritas;
+  $('load').value = taskLoad(task);
   $('description').value = task.deskripsi;
   $('note').value = task.catatan;
 
@@ -440,6 +488,7 @@ function resetForm() {
   $('taskForm').reset();
   $('taskId').value = '';
   $('taskDate').value = today();
+  $('load').value = 1;
 }
 
 function render() {
@@ -559,7 +608,7 @@ async function saveBill(event) {
     id,
     tanggalInput: old?.tanggalInput || new Date().toISOString(),
     nama: $('billName').value,
-    jumlah: $('billAmount').value,
+    jumlah: old?.jumlah || 0,
     bulan: $('billMonth').value,
     jatuhTempo: $('billDueDate').value,
     status: old?.status || 'Belum Dibayar',
@@ -583,11 +632,10 @@ function editBill(id) {
 
   $('billId').value = bill.id;
   $('billName').value = bill.nama;
-  $('billAmount').value = bill.jumlah || '';
   $('billMonth').value = bill.bulan;
   $('billDueDate').value = bill.jatuhTempo;
   $('billNote').value = bill.catatan;
-  openTab('bills');
+  openTab('add');
 }
 
 async function setBillStatus(id, status) {
@@ -633,7 +681,9 @@ function renderBills() {
   $('billTotal').textContent = monthBills.length;
   $('billPaid').textContent = paid.length;
   $('billUnpaid').textContent = unpaid.length;
-  $('billUnpaidAmount').textContent = currency.format(unpaid.reduce((sum, bill) => sum + bill.jumlah, 0));
+  document.querySelectorAll('[data-bill-filter]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.billFilter === status);
+  });
 
   $('billList').innerHTML = list.length
     ? list.map(billCard).join('')
@@ -642,23 +692,29 @@ function renderBills() {
 
 function billCard(bill) {
   const safeId = escapeHtml(bill.id);
-  const action = bill.status === 'Sudah Dibayar'
-    ? `<button onclick="setBillStatus('${safeId}','Belum Dibayar')">Tandai belum</button>`
-    : `<button onclick="setBillStatus('${safeId}','Sudah Dibayar')">Sudah dibayar</button>`;
+  const isPaid = bill.status === 'Sudah Dibayar';
+  const nextStatus = isPaid ? 'Belum Dibayar' : 'Sudah Dibayar';
+  const note = bill.catatan ? `<small>${escapeHtml(bill.catatan)}</small>` : '';
 
   return `<article class="task-card bill-card">
-    <h3>${escapeHtml(bill.nama)}</h3>
-    <p>${escapeHtml(bill.catatan || 'Tidak ada catatan.')}</p>
-    <div class="meta">
-      <span class="pill">${escapeHtml(bill.bulan)}</span>
-      <span class="pill">Jatuh tempo: ${escapeHtml(bill.jatuhTempo)}</span>
-      <span class="pill">${escapeHtml(currency.format(bill.jumlah))}</span>
-      <span class="pill status-${escapeHtml(bill.status.replace(/\s+/g, '-'))}">${escapeHtml(bill.status)}</span>
+    <div class="bill-main">
+      <label class="bill-check">
+        <input type="checkbox" ${isPaid ? 'checked' : ''} onchange="setBillStatus('${safeId}','${nextStatus}')" />
+        <span aria-hidden="true"></span>
+        <strong>${escapeHtml(bill.nama)}</strong>
+      </label>
+      ${note}
     </div>
-    <div class="actions bill-actions">
-      ${action}
-      <button onclick="editBill('${safeId}')">Edit</button>
-      <button class="danger" onclick="deleteBill('${safeId}')">Hapus</button>
+    <div class="bill-row">
+      <div class="meta bill-meta">
+        <span class="pill">${escapeHtml(bill.bulan)}</span>
+        <span class="pill">Jatuh tempo: ${escapeHtml(bill.jatuhTempo)}</span>
+        <span class="pill status-${escapeHtml(bill.status.replace(/\s+/g, '-'))}">${escapeHtml(bill.status)}</span>
+      </div>
+      <div class="actions bill-actions">
+        <button class="icon-btn" onclick="editBill('${safeId}')" aria-label="Edit tagihan" title="Edit">&#9998;</button>
+        <button class="icon-btn" onclick="deleteBill('${safeId}')" aria-label="Hapus tagihan" title="Hapus">&#10005;</button>
+      </div>
     </div>
   </article>`;
 }
@@ -674,10 +730,17 @@ function renderDashboard() {
   $('childrenSummary').innerHTML = cfg.CHILDREN.map((child) => {
     const arr = todays.filter((task) => task.namaAnak === child.name);
     const done = arr.filter((task) => task.status === 'Selesai').length;
+    const points = tasks
+      .filter((task) => task.namaAnak === child.name)
+      .filter((task) => task.status === 'Selesai')
+      .reduce((total, task) => total + taskPoints(task), 0);
     const pct = arr.length ? Math.round(done / arr.length * 100) : 0;
 
     return `<article class="child-card child-card-button" data-child-name="${escapeHtml(child.name)}" tabindex="0" role="button" aria-label="Lihat tugas ${escapeHtml(child.name)}">
-      <h3>${escapeHtml(child.name)}</h3>
+      <div class="child-card-head">
+        <h3>${escapeHtml(child.name)}</h3>
+        <strong class="points-badge">Total ${points} poin</strong>
+      </div>
       <p>${escapeHtml(child.school)} · ${done}/${arr.length} selesai</p>
       <div class="progress"><span style="width:${pct}%"></span></div>
     </article>`;
@@ -696,10 +759,19 @@ function escapeHtml(value) {
 
 function card(task) {
   const safeId = escapeHtml(task.id);
+  const load = taskLoad(task);
+  const points = taskPoints(task);
+  const description = task.deskripsi && !isLegacyLoadText(task.deskripsi)
+    ? `<span>${escapeHtml(task.deskripsi)}</span>`
+    : '';
 
-  return `<article class="task-card">
+  return `<article class="task-card chore-card">
     <h3>${escapeHtml(task.judul)}</h3>
-    <p>${escapeHtml(task.deskripsi || 'Tidak ada deskripsi.')}</p>
+    <p class="task-description">
+      <span>Beban: ${load}</span>
+      <strong class="task-points">${points} poin jika selesai</strong>
+      ${description}
+    </p>
     <div class="meta">
       <span class="pill">${escapeHtml(task.namaAnak)}</span>
       <span class="pill">${escapeHtml(task.kategori)}</span>
@@ -707,12 +779,10 @@ function card(task) {
       <span class="pill status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span>
       <span class="pill">${escapeHtml(task.prioritas)}</span>
     </div>
-    ${task.catatan ? `<p><b>Catatan:</b> ${escapeHtml(task.catatan)}</p>` : ''}
-    <div class="actions">
-      <button onclick="setTaskStatus('${safeId}','Dikerjakan')">Dikerjakan</button>
+    <div class="actions chore-actions">
       <button onclick="setTaskStatus('${safeId}','Selesai')">Selesai</button>
-      <button onclick="editTask('${safeId}')">Edit</button>
-      <button class="danger" onclick="delTask('${safeId}')">Hapus</button>
+      <button class="icon-btn" onclick="editTask('${safeId}')" aria-label="Edit tugas" title="Edit">&#9998;</button>
+      <button class="icon-btn danger" onclick="delTask('${safeId}')" aria-label="Hapus tugas" title="Hapus">&#10005;</button>
     </div>
   </article>`;
 }

@@ -58,9 +58,9 @@
 
     <nav class="tabs" aria-label="Menu utama">
       <button data-tab="dashboard" class="active">Beranda</button>
-      <button data-tab="add">Tambah</button>
       <button data-tab="tasks">Tugas</button>
       <button data-tab="bills">Tagihan</button>
+      <button data-tab="add">Tambah</button>
     </nav>
 
     <section id="syncStatus" class="sync-status">Mode lokal aktif. Sinkronisasi belum diatur.</section>
@@ -77,38 +77,60 @@
     </section>
 
     <section id="add" class="panel">
-      <h2>Tambah Tugas</h2>
-      <form id="taskForm" class="task-form">
-        <input type="hidden" id="taskId" />
-        <label>Judul Tugas<input id="title" required placeholder="Contoh: Menyapu ruang tamu" /></label>
-        <label>Anak
-          <select id="child" required></select>
-        </label>
-        <label>Kategori
-          <select id="category">
-            <option>Pekerjaan Rumah</option>
-            <option>Belajar</option>
-            <option>Ibadah/Kedisiplinan</option>
-            <option>Pribadi</option>
-            <option>Lainnya</option>
-          </select>
-        </label>
-        <div class="form-row">
-          <label>Tanggal<input id="taskDate" type="date" required /></label>
-          <label>Jam Target<input id="targetTime" type="time" /></label>
-        </div>
-        <label>Prioritas
-          <select id="priority">
-            <option>Normal</option>
-            <option>Tinggi</option>
-            <option>Rendah</option>
-          </select>
-        </label>
-        <label>Deskripsi<textarea id="description" rows="3" placeholder="Catatan singkat tugas"></textarea></label>
-        <label>Catatan<textarea id="note" rows="2" placeholder="Opsional"></textarea></label>
-        <button type="submit" class="primary">Simpan Tugas</button>
-        <button type="button" id="resetForm" class="secondary">Kosongkan</button>
-      </form>
+      <div class="form-stack">
+        <section class="form-section">
+          <h2>Tambah Daftar Tugas</h2>
+          <form id="taskForm" class="task-form">
+            <input type="hidden" id="taskId" />
+            <label>Judul Tugas<input id="title" required placeholder="Contoh: Menyapu ruang tamu" /></label>
+            <label>Anak
+              <select id="child" required></select>
+            </label>
+            <label>Kategori
+              <select id="category">
+                <option>Pekerjaan Rumah</option>
+                <option>Belajar</option>
+                <option>Ibadah/Kedisiplinan</option>
+                <option>Pribadi</option>
+                <option>Lainnya</option>
+              </select>
+            </label>
+            <div class="form-row">
+              <label>Tanggal<input id="taskDate" type="date" required /></label>
+              <label>Jam Target<input id="targetTime" type="time" /></label>
+            </div>
+            <label>Prioritas
+              <select id="priority">
+                <option>Normal</option>
+                <option>Tinggi</option>
+                <option>Rendah</option>
+              </select>
+            </label>
+            <label>Beban
+              <input id="load" type="number" min="1" step="1" value="1" required placeholder="Contoh: 2" />
+            </label>
+            <label>Deskripsi<textarea id="description" rows="3" placeholder="Catatan singkat tugas"></textarea></label>
+            <label>Catatan<textarea id="note" rows="2" placeholder="Opsional"></textarea></label>
+            <button type="submit" class="primary">Simpan Tugas</button>
+            <button type="button" id="resetForm" class="secondary">Kosongkan</button>
+          </form>
+        </section>
+
+        <section class="form-section">
+          <h2>Tambah Tagihan</h2>
+          <form id="billForm" class="task-form bill-form">
+            <input type="hidden" id="billId" />
+            <label>Nama Tagihan<input id="billName" required placeholder="Contoh: SPP sekolah" /></label>
+            <div class="form-row">
+              <label>Bulan<input id="billMonth" type="month" required /></label>
+              <label>Jatuh Tempo<input id="billDueDate" type="date" required /></label>
+            </div>
+            <label>Catatan<textarea id="billNote" rows="2" placeholder="Opsional"></textarea></label>
+            <button type="submit" class="primary">Simpan Tagihan</button>
+            <button type="button" id="resetBillForm" class="secondary">Kosongkan</button>
+          </form>
+        </section>
+      </div>
     </section>
 
     <section id="tasks" class="panel">
@@ -132,25 +154,10 @@
         <button id="refreshBillsBtn" class="small-btn">Muat ulang</button>
       </div>
       <div class="stats-grid bill-stats">
-        <article class="stat-card"><span id="billTotal">0</span><small>Total Bulan Ini</small></article>
-        <article class="stat-card"><span id="billPaid">0</span><small>Sudah Dibayar</small></article>
-        <article class="stat-card"><span id="billUnpaid">0</span><small>Belum Dibayar</small></article>
-        <article class="stat-card"><span id="billUnpaidAmount">Rp0</span><small>Sisa Tagihan</small></article>
+        <button type="button" class="stat-card stat-filter" data-bill-filter="all"><span id="billTotal">0</span><small>Total Bulan Ini</small></button>
+        <button type="button" class="stat-card stat-filter" data-bill-filter="Sudah Dibayar"><span id="billPaid">0</span><small>Sudah Dibayar</small></button>
+        <button type="button" class="stat-card stat-filter" data-bill-filter="Belum Dibayar"><span id="billUnpaid">0</span><small>Belum Dibayar</small></button>
       </div>
-
-      <form id="billForm" class="task-form bill-form">
-        <input type="hidden" id="billId" />
-        <label>Nama Tagihan<input id="billName" required placeholder="Contoh: SPP sekolah" /></label>
-        <div class="form-row">
-          <label>Bulan<input id="billMonth" type="month" required /></label>
-          <label>Jatuh Tempo<input id="billDueDate" type="date" required /></label>
-        </div>
-        <label>Jumlah<input id="billAmount" type="number" min="0" step="1000" placeholder="Contoh: 250000" /></label>
-        <label>Catatan<textarea id="billNote" rows="2" placeholder="Opsional"></textarea></label>
-        <button type="submit" class="primary">Simpan Tagihan</button>
-        <button type="button" id="resetBillForm" class="secondary">Kosongkan</button>
-      </form>
-
       <div class="filters bill-filters">
         <select id="filterBillMonth" aria-label="Filter bulan tagihan"></select>
         <select id="filterBillStatus" aria-label="Filter status tagihan">
