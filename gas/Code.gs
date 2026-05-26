@@ -1,40 +1,44 @@
-const SHEET_NAME = 'tasks';
-const BILL_SHEET_NAME = 'bills';
-const REDEMPTION_SHEET_NAME = 'point_redemptions';
+var SHEET_NAME = 'tasks';
+var BILL_SHEET_NAME = 'bills';
+var REDEMPTION_SHEET_NAME = 'point_redemptions';
+var SPREADSHEET_ID = '';
 
 function doGet(e) {
-  e = e || { parameter: {} };
-  const action = e.parameter.action || 'getTasks';
+  try {
+    e = e || { parameter: {} };
+    var action = e.parameter.action || 'getTasks';
 
-  if (action === 'getTasks' || action === 'list') {
-    return getTasks(e.parameter || {});
+    if (action === 'getTasks' || action === 'list') {
+      return getTasks(e.parameter || {});
+    }
+    if (action === 'getTaskSummary') {
+      return getTaskSummary(e.parameter || {});
+    }
+    if (action === 'getBills') {
+      return getBills();
+    }
+    if (action === 'getPointRedemptions') {
+      return getPointRedemptions();
+    }
+    if (action === 'setup') {
+      return setupSheet();
+    }
+
+    return jsonResponse({ success: false, message: 'Action GET tidak dikenali', action: action });
+  } catch (err) {
+    return jsonResponse({ success: false, message: err.message, stack: err.stack || '' });
   }
-
-  if (action === 'getTaskSummary') {
-    return getTaskSummary(e.parameter || {});
-  }
-
-  if (action === 'getBills') {
-    return getBills();
-  }
-
-  if (action === 'getPointRedemptions') {
-    return getPointRedemptions();
-  }
-
-  if (action === 'setup') {
-    return setupSheet();
-  }
-
-  return jsonResponse({ success: false, message: 'Action GET tidak dikenali', action });
 }
 
 function doPost(e) {
   try {
     e = e || {};
-    const body = e.postData && e.postData.contents ? e.postData.contents : '{}';
-    const data = JSON.parse(body);
-    const action = data.action;
+    var body = '{}';
+    if (e.postData && e.postData.contents) {
+      body = e.postData.contents;
+    }
+    var data = JSON.parse(body);
+    var action = data.action;
 
     if (action === 'addTask' || action === 'create') return addTask(data.task || data);
     if (action === 'updateTask' || action === 'update') return updateTask(data.task || data);
@@ -46,7 +50,7 @@ function doPost(e) {
     if (action === 'deleteBill') return deleteBill(data.id);
     if (action === 'redeemPoints') return redeemPoints(data);
 
-    return jsonResponse({ success: false, message: 'Action POST tidak dikenali', action });
+    return jsonResponse({ success: false, message: 'Action POST tidak dikenali', action: action });
   } catch (err) {
     return jsonResponse({ success: false, message: err.message });
   }
@@ -58,6 +62,48 @@ function jsonResponse(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function testRun() {
+  Logger.log('Code.gs berhasil dijalankan.');
+  return 'Code.gs berhasil dijalankan.';
+}
+
+function ping() {
+  Logger.log('ping ok');
+  return 'ping ok';
+}
+
+function setupAllSheets() {
+  try {
+    getTaskSheet();
+    getBillSheet();
+    getRedemptionSheet();
+    Logger.log('Setup sheet berhasil.');
+    return 'Setup sheet berhasil.';
+  } catch (err) {
+    Logger.log('ERROR setupAllSheets: ' + err.message);
+    return 'ERROR: ' + err.message;
+  }
+}
+
+function getSpreadsheet() {
+  var ss;
+  if (SPREADSHEET_ID) {
+    ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  } else {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  }
+
+  if (!ss) {
+    throw new Error('Spreadsheet tidak ditemukan. Buka Apps Script dari Google Sheet, atau isi SPREADSHEET_ID.');
+  }
+  return ss;
+}
+
+function setupSheet() {
+  getTaskSheet();
+  return jsonResponse({ success: true, message: 'Sheet tasks berhasil disiapkan.' });
+}
+
 function getHeaders() {
   return [
     'id', 'tanggalInput', 'namaAnak', 'judul', 'deskripsi', 'kategori',
@@ -65,236 +111,238 @@ function getHeaders() {
   ];
 }
 
-function getSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-
-  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
-
-  const headers = getHeaders();
-
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-  } else {
-    const existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
-    const isHeaderEmpty = existingHeaders.every(v => String(v || '').trim() === '');
-    if (isHeaderEmpty) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    } else {
-      headers.forEach(header => {
-        if (!existingHeaders.includes(header)) {
-          sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
-        }
-      });
-    }
-  }
-
-  return sheet;
-}
-
-function setupSheet() {
-  getSheet();
-  return jsonResponse({ success: true, message: 'Sheet tasks berhasil disiapkan.' });
-}
-
-function normalizeDateOnly(value, timezone) {
-  if (!value) return '';
-  if (value instanceof Date) return Utilities.formatDate(value, timezone, 'yyyy-MM-dd');
-  const text = String(value).trim();
-  const match = text.match(/^\d{4}-\d{2}-\d{2}/);
-  return match ? match[0] : text;
-}
-
-function legacyTaskLoad(task) {
-  const text = String(task.catatan || task.deskripsi || '');
-  const match = text.match(/beban\s*:\s*(\d+)/i);
-  return match ? Number(match[1]) : 1;
-}
-
-function taskLoad(task) {
-  const load = Number(task.beban || task.load || 0);
-  return load > 0 ? load : legacyTaskLoad(task);
-}
-
-function taskPoints(task) {
-  return taskLoad(task) * 200;
-}
-
-function getTaskObjects() {
-  const sheet = getSheet();
-  const values = sheet.getDataRange().getValues();
-
-  if (values.length <= 1) return [];
-
-  const headers = values.shift();
-  const timezone = Session.getScriptTimeZone();
-
-  return values
-    .filter(row => row.some(cell => String(cell || '').trim() !== ''))
-    .map(row => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        if (!header) return;
-        let value = row[index];
-        if (value instanceof Date) {
-          value = Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
-        }
-        obj[header] = value;
-      });
-      obj.tanggalTugas = normalizeDateOnly(obj.tanggalTugas, timezone);
-      return obj;
-    });
-}
-
-function getTasks(params) {
-  params = params || {};
-  const date = params.date || '';
-  const child = params.child || '';
-  const status = params.status || '';
-
-  const data = getTaskObjects()
-    .filter(task => !date || task.tanggalTugas === date)
-    .filter(task => !child || child === 'all' || task.namaAnak === child)
-    .filter(task => !status || status === 'all' || task.status === status);
-
-  return jsonResponse({ success: true, data });
-}
-
-function getTaskSummary(params) {
-  params = params || {};
-  const date = params.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  const data = getTaskObjects();
-  const redeemed = getRedeemedPointTotals();
-  const daily = data.filter(task => task.tanggalTugas === date);
-  const children = {};
-
-  data.forEach(task => {
-    const name = task.namaAnak || '';
-    if (!name) return;
-    if (!children[name]) children[name] = { total: 0, done: 0, points: 0 };
-
-    children[name].total += 1;
-    if (task.status === 'Selesai') {
-      children[name].done += 1;
-      children[name].points += taskPoints(task);
-    }
-  });
-
-  Object.keys(children).forEach(name => {
-    children[name].earnedPoints = children[name].points;
-    children[name].redeemedPoints = redeemed[name] || 0;
-    children[name].points = Math.max(0, children[name].points - children[name].redeemedPoints);
-  });
-
-  return jsonResponse({
-    success: true,
-    date,
-    redemptionsIncluded: true,
-    stats: {
-      total: daily.length,
-      done: daily.filter(task => task.status === 'Selesai').length,
-      pending: daily.filter(task => ['Belum', 'Dikerjakan'].includes(task.status)).length
-    },
-    children
-  });
+function getBillHeaders() {
+  return [
+    'id', 'tanggalInput', 'nama', 'jumlah', 'bulan', 'jatuhTempo',
+    'status', 'waktuBayar', 'catatan'
+  ];
 }
 
 function getRedemptionHeaders() {
   return ['id', 'tanggal', 'namaAnak', 'points', 'catatan'];
 }
 
-function getRedemptionSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(REDEMPTION_SHEET_NAME);
+function ensureSheet(sheetName, headers) {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  var existingHeaders;
+  var isEmpty;
+  var i;
 
-  if (!sheet) sheet = ss.insertSheet(REDEMPTION_SHEET_NAME);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
 
-  const headers = getRedemptionHeaders();
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
-  } else {
-    const existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
-    const isHeaderEmpty = existingHeaders.every(v => String(v || '').trim() === '');
-    if (isHeaderEmpty) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sheet;
+  }
+
+  existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
+  isEmpty = true;
+  for (i = 0; i < existingHeaders.length; i++) {
+    if (String(existingHeaders[i] || '').trim() !== '') {
+      isEmpty = false;
+      break;
+    }
+  }
+
+  if (isEmpty) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sheet;
+  }
+
+  for (i = 0; i < headers.length; i++) {
+    if (arrayIndexOf(existingHeaders, headers[i]) < 0) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(headers[i]);
+    }
   }
 
   return sheet;
 }
 
-function getPointRedemptionObjects() {
-  const sheet = getRedemptionSheet();
-  const values = sheet.getDataRange().getValues();
-
-  if (values.length <= 1) return [];
-
-  const headers = values.shift();
-  const timezone = Session.getScriptTimeZone();
-
-  return values
-    .filter(row => row.some(cell => String(cell || '').trim() !== ''))
-    .map(row => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        if (!header) return;
-        let value = row[index];
-        if (value instanceof Date) {
-          value = Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
-        }
-        obj[header] = value;
-      });
-      obj.points = Number(obj.points || 0);
-      return obj;
-    });
+function arrayIndexOf(arr, value) {
+  for (var i = 0; i < arr.length; i++) {
+    if (String(arr[i]) === String(value)) return i;
+  }
+  return -1;
 }
 
-function getRedeemedPointTotals() {
-  return getPointRedemptionObjects().reduce((totals, item) => {
-    const name = item.namaAnak || '';
-    if (!name) return totals;
-    totals[name] = (totals[name] || 0) + Number(item.points || 0);
-    return totals;
-  }, {});
+function getTaskSheet() {
+  return ensureSheet(SHEET_NAME, getHeaders());
 }
 
-function getPointRedemptions() {
-  return jsonResponse({ success: true, data: getPointRedemptionObjects() });
+function getSheet() {
+  return getTaskSheet();
 }
 
-function redeemPoints(data) {
-  const sheet = getRedemptionSheet();
-  const namaAnak = data.namaAnak || data.child || '';
-  const points = Number(data.points || 0);
+function getBillSheet() {
+  return ensureSheet(BILL_SHEET_NAME, getBillHeaders());
+}
 
-  if (!namaAnak || points <= 0) {
-    return jsonResponse({ success: false, message: 'Data pencairan poin tidak lengkap.' });
+function getRedemptionSheet() {
+  return ensureSheet(REDEMPTION_SHEET_NAME, getRedemptionHeaders());
+}
+
+function normalizeDateOnly(value, timezone) {
+  var text;
+  var match;
+  if (!value) return '';
+  if (value instanceof Date) return Utilities.formatDate(value, timezone, 'yyyy-MM-dd');
+  text = String(value).trim();
+  match = text.match(/^\d{4}-\d{2}-\d{2}/);
+  if (match) return match[0];
+  return text;
+}
+
+function dateValue(value, timezone) {
+  if (value instanceof Date) return Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
+  return value;
+}
+
+function isRowFilled(row) {
+  for (var i = 0; i < row.length; i++) {
+    if (String(row[i] || '').trim() !== '') return true;
+  }
+  return false;
+}
+
+function rowToObject(headers, row, timezone) {
+  var obj = {};
+  var header;
+  for (var i = 0; i < headers.length; i++) {
+    header = headers[i];
+    if (header) obj[header] = dateValue(row[i], timezone);
+  }
+  return obj;
+}
+
+function getTaskObjects() {
+  var sheet = getTaskSheet();
+  var values = sheet.getDataRange().getValues();
+  var headers;
+  var timezone;
+  var data = [];
+  var obj;
+  var i;
+
+  if (values.length <= 1) return data;
+
+  headers = values.shift();
+  timezone = Session.getScriptTimeZone();
+
+  for (i = 0; i < values.length; i++) {
+    if (!isRowFilled(values[i])) continue;
+    obj = rowToObject(headers, values[i], timezone);
+    obj.tanggalTugas = normalizeDateOnly(obj.tanggalTugas, timezone);
+    data.push(obj);
   }
 
-  const id = data.id || ('rdm-' + Date.now());
-  sheet.appendRow([
-    id,
-    data.tanggal || new Date(),
-    namaAnak,
-    points,
-    data.catatan || 'Poin dicairkan'
-  ]);
+  return data;
+}
 
-  return jsonResponse({ success: true, message: 'Poin berhasil dicairkan.', id });
+function getTasks(params) {
+  params = params || {};
+  var date = params.date || '';
+  var child = params.child || '';
+  var status = params.status || '';
+  var rows = getTaskObjects();
+  var data = [];
+  var task;
+  var i;
+
+  for (i = 0; i < rows.length; i++) {
+    task = rows[i];
+    if (date && task.tanggalTugas !== date) continue;
+    if (child && child !== 'all' && task.namaAnak !== child) continue;
+    if (status && status !== 'all' && task.status !== status) continue;
+    data.push(task);
+  }
+
+  return jsonResponse({ success: true, data: data });
+}
+
+function legacyTaskLoad(task) {
+  var text = String(task.catatan || task.deskripsi || '');
+  var match = text.match(/beban\s*:\s*(\d+)/i);
+  if (match) return Number(match[1]);
+  return 1;
+}
+
+function taskLoad(task) {
+  var load = Number(task.beban || task.load || 0);
+  if (load > 0) return load;
+  return legacyTaskLoad(task);
+}
+
+function taskPoints(task) {
+  return taskLoad(task) * 200;
+}
+
+function getTaskSummary(params) {
+  params = params || {};
+  var date = params.date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var data = getTaskObjects();
+  var redeemed = getRedeemedPointTotals();
+  var children = {};
+  var stats = { total: 0, done: 0, pending: 0 };
+  var task;
+  var name;
+  var child;
+  var i;
+
+  for (i = 0; i < data.length; i++) {
+    task = data[i];
+    name = task.namaAnak || '';
+    if (!name) continue;
+
+    if (!children[name]) children[name] = { total: 0, done: 0, points: 0 };
+    child = children[name];
+    child.total += 1;
+
+    if (task.status === 'Selesai') {
+      child.done += 1;
+      child.points += taskPoints(task);
+    }
+
+    if (task.tanggalTugas === date) {
+      stats.total += 1;
+      if (task.status === 'Selesai') stats.done += 1;
+      if (task.status === 'Belum' || task.status === 'Dikerjakan') stats.pending += 1;
+    }
+  }
+
+  for (name in children) {
+    if (children.hasOwnProperty(name)) {
+      children[name].earnedPoints = children[name].points;
+      children[name].redeemedPoints = redeemed[name] || 0;
+      children[name].points = Math.max(0, children[name].earnedPoints - children[name].redeemedPoints);
+    }
+  }
+
+  return jsonResponse({
+    success: true,
+    date: date,
+    redemptionsIncluded: true,
+    stats: stats,
+    children: children
+  });
 }
 
 function findRowById(sheet, id) {
-  const lastRow = sheet.getLastRow();
+  var lastRow = sheet.getLastRow();
+  var ids;
+  var i;
   if (lastRow < 2) return -1;
 
-  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (let i = 0; i < ids.length; i++) {
+  ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (i = 0; i < ids.length; i++) {
     if (String(ids[i][0]) === String(id)) return i + 2;
   }
   return -1;
 }
 
 function addTask(task) {
-  const sheet = getSheet();
-  const id = task.id || ('tsk-' + Date.now());
+  var sheet = getTaskSheet();
+  var id = task.id || ('tsk-' + new Date().getTime());
 
   sheet.appendRow([
     id,
@@ -312,12 +360,12 @@ function addTask(task) {
     Number(task.beban || 1)
   ]);
 
-  return jsonResponse({ success: true, message: 'Tugas berhasil ditambahkan.', id });
+  return jsonResponse({ success: true, message: 'Tugas berhasil ditambahkan.', id: id });
 }
 
 function updateTask(task) {
-  const sheet = getSheet();
-  const row = findRowById(sheet, task.id);
+  var sheet = getTaskSheet();
+  var row = findRowById(sheet, task.id);
 
   if (row < 0) return addTask(task);
 
@@ -341,23 +389,24 @@ function updateTask(task) {
 }
 
 function updateStatus(data) {
-  const sheet = getSheet();
-  const row = findRowById(sheet, data.id);
+  var sheet = getTaskSheet();
+  var row = findRowById(sheet, data.id);
 
   if (row < 0) return jsonResponse({ success: false, message: 'Tugas tidak ditemukan.' });
 
   sheet.getRange(row, 10).setValue(data.status || 'Belum');
-
   if (data.status === 'Selesai') {
     sheet.getRange(row, 11).setValue(data.waktuSelesai || new Date());
+  } else {
+    sheet.getRange(row, 11).setValue('');
   }
 
   return jsonResponse({ success: true, message: 'Status tugas berhasil diperbarui.' });
 }
 
 function deleteTask(id) {
-  const sheet = getSheet();
-  const row = findRowById(sheet, id);
+  var sheet = getTaskSheet();
+  var row = findRowById(sheet, id);
 
   if (row < 0) return jsonResponse({ success: false, message: 'Tugas tidak ditemukan.' });
 
@@ -365,66 +414,97 @@ function deleteTask(id) {
   return jsonResponse({ success: true, message: 'Tugas berhasil dihapus.' });
 }
 
-function testRun() {
-  return setupSheet();
-}
+function getPointRedemptionObjects() {
+  var sheet = getRedemptionSheet();
+  var values = sheet.getDataRange().getValues();
+  var headers;
+  var timezone;
+  var data = [];
+  var obj;
+  var i;
 
-function getBillHeaders() {
-  return [
-    'id', 'tanggalInput', 'nama', 'jumlah', 'bulan', 'jatuhTempo',
-    'status', 'waktuBayar', 'catatan'
-  ];
-}
+  if (values.length <= 1) return data;
 
-function getBillSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(BILL_SHEET_NAME);
+  headers = values.shift();
+  timezone = Session.getScriptTimeZone();
 
-  if (!sheet) sheet = ss.insertSheet(BILL_SHEET_NAME);
-
-  const headers = getBillHeaders();
-
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-  } else {
-    const existingHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
-    const isHeaderEmpty = existingHeaders.every(v => String(v || '').trim() === '');
-    if (isHeaderEmpty) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  for (i = 0; i < values.length; i++) {
+    if (!isRowFilled(values[i])) continue;
+    obj = rowToObject(headers, values[i], timezone);
+    obj.points = Number(obj.points || 0);
+    data.push(obj);
   }
 
-  return sheet;
+  return data;
+}
+
+function getRedeemedPointTotals() {
+  var rows = getPointRedemptionObjects();
+  var totals = {};
+  var name;
+  var i;
+
+  for (i = 0; i < rows.length; i++) {
+    name = rows[i].namaAnak || '';
+    if (!name) continue;
+    totals[name] = (totals[name] || 0) + Number(rows[i].points || 0);
+  }
+
+  return totals;
+}
+
+function getPointRedemptions() {
+  return jsonResponse({ success: true, data: getPointRedemptionObjects() });
+}
+
+function redeemPoints(data) {
+  var sheet = getRedemptionSheet();
+  var namaAnak = data.namaAnak || data.child || '';
+  var points = Number(data.points || 0);
+  var id;
+
+  if (!namaAnak || points <= 0) {
+    return jsonResponse({ success: false, message: 'Data pencairan poin tidak lengkap.' });
+  }
+
+  id = data.id || ('rdm-' + new Date().getTime());
+  sheet.appendRow([
+    id,
+    data.tanggal || new Date(),
+    namaAnak,
+    points,
+    data.catatan || 'Poin dicairkan'
+  ]);
+
+  return jsonResponse({ success: true, message: 'Poin berhasil dicairkan.', id: id });
 }
 
 function getBills() {
-  const sheet = getBillSheet();
-  const values = sheet.getDataRange().getValues();
+  var sheet = getBillSheet();
+  var values = sheet.getDataRange().getValues();
+  var headers;
+  var timezone;
+  var data = [];
+  var obj;
+  var i;
 
-  if (values.length <= 1) return jsonResponse({ success: true, data: [] });
+  if (values.length <= 1) return jsonResponse({ success: true, data: data });
 
-  const headers = values.shift();
-  const timezone = Session.getScriptTimeZone();
+  headers = values.shift();
+  timezone = Session.getScriptTimeZone();
 
-  const data = values
-    .filter(row => row.some(cell => String(cell || '').trim() !== ''))
-    .map(row => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        if (!header) return;
-        let value = row[index];
-        if (value instanceof Date) {
-          value = Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
-        }
-        obj[header] = value;
-      });
-      return obj;
-    });
+  for (i = 0; i < values.length; i++) {
+    if (!isRowFilled(values[i])) continue;
+    obj = rowToObject(headers, values[i], timezone);
+    data.push(obj);
+  }
 
-  return jsonResponse({ success: true, data });
+  return jsonResponse({ success: true, data: data });
 }
 
 function addBill(bill) {
-  const sheet = getBillSheet();
-  const id = bill.id || ('bil-' + Date.now());
+  var sheet = getBillSheet();
+  var id = bill.id || ('bil-' + new Date().getTime());
 
   sheet.appendRow([
     id,
@@ -438,12 +518,12 @@ function addBill(bill) {
     bill.catatan || ''
   ]);
 
-  return jsonResponse({ success: true, message: 'Tagihan berhasil ditambahkan.', id });
+  return jsonResponse({ success: true, message: 'Tagihan berhasil ditambahkan.', id: id });
 }
 
 function updateBill(bill) {
-  const sheet = getBillSheet();
-  const row = findRowById(sheet, bill.id);
+  var sheet = getBillSheet();
+  var row = findRowById(sheet, bill.id);
 
   if (row < 0) return addBill(bill);
 
@@ -463,20 +543,35 @@ function updateBill(bill) {
 }
 
 function updateBillStatus(data) {
-  const sheet = getBillSheet();
-  const row = findRowById(sheet, data.id);
+  var sheet;
+  var row;
+  var status;
+  var waktuBayar = '';
+
+  data = data || {};
+  if (!data.id) {
+    return jsonResponse({ success: false, message: 'ID tagihan wajib diisi.' });
+  }
+
+  sheet = getBillSheet();
+  row = findRowById(sheet, data.id);
 
   if (row < 0) return jsonResponse({ success: false, message: 'Tagihan tidak ditemukan.' });
 
-  sheet.getRange(row, 7).setValue(data.status || 'Belum Dibayar');
-  sheet.getRange(row, 8).setValue(data.status === 'Sudah Dibayar' ? (data.waktuBayar || new Date()) : '');
+  status = data.status || 'Belum Dibayar';
+  if (status === 'Sudah Dibayar') {
+    waktuBayar = data.waktuBayar || new Date();
+  }
+
+  sheet.getRange(row, 7).setValue(status);
+  sheet.getRange(row, 8).setValue(waktuBayar);
 
   return jsonResponse({ success: true, message: 'Status tagihan berhasil diperbarui.' });
 }
 
 function deleteBill(id) {
-  const sheet = getBillSheet();
-  const row = findRowById(sheet, id);
+  var sheet = getBillSheet();
+  var row = findRowById(sheet, id);
 
   if (row < 0) return jsonResponse({ success: false, message: 'Tagihan tidak ditemukan.' });
 
