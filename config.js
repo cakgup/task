@@ -30,7 +30,7 @@ window.CAKGUP_CONFIG = {
     { name: 'Satpam', month: '2026-05', status: 'Belum Dibayar', note: 'Rumah Tangga & Utilitas' },
     { name: 'Kartu Kredit BRI', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
     { name: 'Transfer Bapak', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
-    { name: 'Tahlilan Fatih', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
+    { name: 'Tahlila Fatih', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
     { name: 'Iuran Liqo', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
     { name: 'Transfer Rek Mandiri Dik Nora', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
     { name: 'Tring Pegadaian', month: '2026-05', status: 'Sudah Dibayar', note: 'Keuangan, Iuran & Lainnya' },
