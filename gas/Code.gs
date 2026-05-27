@@ -728,15 +728,53 @@ function addBill(bill) {
   return jsonResponse({ success: true, message: 'Tagihan berhasil ditambahkan.', id: id });
 }
 
+function duplicateBillKey(month, name) {
+  return [
+    String(month || '').slice(0, 7),
+    normalizeTaskTitle(name)
+  ].join('|');
+}
+
+function findDuplicateBillRow(sheet, bill, ignoreId) {
+  var values = sheetValues(sheet);
+  var headers;
+  var map;
+  var targetKey;
+  var row;
+  var rowId;
+  var rowKey;
+  var i;
+
+  if (values.length <= 1) return -1;
+
+  headers = values.shift();
+  map = headerMap(headers);
+  targetKey = duplicateBillKey(bill.bulan || bill.month, bill.nama || bill.name);
+
+  for (i = 0; i < values.length; i++) {
+    row = values[i];
+    if (!isRowFilled(row)) continue;
+    rowId = String(row[map.id] || '');
+    if (ignoreId && rowId === String(ignoreId)) continue;
+    rowKey = duplicateBillKey(row[map.bulan], row[map.nama]);
+    if (rowKey === targetKey) return i + 2;
+  }
+
+  return -1;
+}
+
 function updateBill(bill) {
   var sheet = getBillSheet();
   var row = findRowById(sheet, bill.id);
   var tanggalInput = bill.tanggalInput || new Date();
 
+  if (row < 0) {
+    row = findDuplicateBillRow(sheet, bill, bill.id);
+  }
   if (row < 0) return addBill(bill);
 
   sheet.getRange(row, 1, 1, 9).setValues([[
-    bill.id,
+    bill.id || sheet.getRange(row, 1).getValue(),
     tanggalInput,
     bill.nama || '',
     Number(bill.jumlah || 0),

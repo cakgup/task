@@ -826,17 +826,21 @@ function editBill(id) {
 
 async function setBillStatus(id, status) {
   const waktuBayar = status === 'Sudah Dibayar' ? new Date().toISOString() : '';
+  let updatedBill = null;
 
   bills = bills.map((bill) => {
     if (bill.id !== id) return bill;
-    return {
+    updatedBill = {
       ...bill,
       status,
       waktuBayar: status === 'Sudah Dibayar' ? waktuBayar : ''
     };
+    return updatedBill;
   });
 
-  await persistBill('updateBillStatus', { id, status, waktuBayar });
+  if (updatedBill) {
+    await persistBill('updateBill', { bill: updatedBill });
+  }
   renderBills();
   setStatus('Status tagihan diperbarui.');
 }
