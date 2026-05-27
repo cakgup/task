@@ -44,6 +44,7 @@ function doPost(e) {
     if (action === 'updateTask' || action === 'update') return updateTask(data.task || data);
     if (action === 'updateStatus' || action === 'status') return updateStatus(data);
     if (action === 'deleteTask' || action === 'delete') return deleteTask(data.id);
+    if (action === 'ensureDailyTasks') return ensureDailyTasks(data);
     if (action === 'addBill') return addBill(data.bill || data);
     if (action === 'updateBill') return updateBill(data.bill || data);
     if (action === 'updateBillStatus') return updateBillStatus(data);
@@ -203,6 +204,11 @@ function duplicateTaskKey(date, child, title) {
     String(child || '').trim().toLowerCase(),
     normalizeTaskTitle(title)
   ].join('|');
+}
+
+function dateForTask(value) {
+  if (value) return normalizeDateOnly(value, Session.getScriptTimeZone());
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
 function dateValue(value, timezone) {
@@ -448,6 +454,77 @@ function findDuplicateDailyTaskRow(sheet, task, ignoreId) {
   }
 
   return -1;
+}
+
+function createDailyTaskFromTemplate(template, date, index) {
+  return [
+    'tsk-' + new Date().getTime() + '-' + index,
+    new Date(),
+    template.child || '',
+    template.title || '',
+    template.description || '',
+    template.category || 'Pekerjaan Rumah',
+    date,
+    template.time || '',
+    template.priority || 'Normal',
+    'Belum',
+    '',
+    '',
+    Number(template.load || 1)
+  ];
+}
+
+function getExistingDailyTaskKeys(sheet) {
+  var values = sheetValues(sheet);
+  var headers;
+  var map;
+  var keys = {};
+  var row;
+  var key;
+  var i;
+
+  if (values.length <= 1) return keys;
+
+  headers = values.shift();
+  map = headerMap(headers);
+
+  for (i = 0; i < values.length; i++) {
+    row = values[i];
+    if (!isRowFilled(row)) continue;
+    key = duplicateTaskKey(row[map.tanggalTugas], row[map.namaAnak], row[map.judul]);
+    keys[key] = true;
+  }
+
+  return keys;
+}
+
+function ensureDailyTasks(data) {
+  var sheet = getTaskSheet();
+  var date = dateForTask(data.date);
+  var templates = data.templates || [];
+  var existing = getExistingDailyTaskKeys(sheet);
+  var rows = [];
+  var key;
+  var template;
+  var i;
+
+  for (i = 0; i < templates.length; i++) {
+    template = templates[i];
+    key = duplicateTaskKey(date, template.child, template.title);
+    if (existing[key]) continue;
+    existing[key] = true;
+    rows.push(createDailyTaskFromTemplate(template, date, i));
+  }
+
+  if (rows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 13).setValues(rows);
+  }
+
+  return jsonResponse({
+    success: true,
+    created: rows.length,
+    message: rows.length + ' tugas harian dibuat otomatis.'
+  });
 }
 
 function addTask(task) {

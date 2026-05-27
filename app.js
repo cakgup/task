@@ -445,6 +445,14 @@ async function ensureDailyTasks() {
   if (!templates.length) return;
   if (($('filterTaskDate')?.value || today()) !== today()) return;
 
+  if (cfg.GAS_URL) {
+    await sendToGas('ensureDailyTasks', {
+      date: today(),
+      templates
+    });
+    return;
+  }
+
   const existingKeys = new Set(tasks.map(dailyTaskKey));
   const missingTasks = [];
 
@@ -520,13 +528,19 @@ async function loadTasks() {
 
   try {
     if (cfg.GAS_URL) {
-      await loadTaskSummary();
       const response = await fetch(`${cfg.GAS_URL}?action=getTasks&date=${encodeURIComponent(filterDate)}&ts=${Date.now()}`);
       const json = await response.json();
       const rows = Array.isArray(json) ? json : (json.data || []);
       tasks = uniqueDailyTasks(rows.map(normalizeTask).filter((task) => task.id && task.judul));
       cacheTaskRows(tasks);
       await ensureDailyTasks();
+      if (filterDate === today()) {
+        const refreshed = await fetch(`${cfg.GAS_URL}?action=getTasks&date=${encodeURIComponent(filterDate)}&ts=${Date.now()}`);
+        const refreshedJson = await refreshed.json();
+        const refreshedRows = Array.isArray(refreshedJson) ? refreshedJson : (refreshedJson.data || []);
+        tasks = uniqueDailyTasks(refreshedRows.map(normalizeTask).filter((task) => task.id && task.judul));
+        cacheTaskRows(tasks);
+      }
       await loadTaskSummary();
       setStatus('Data tersinkron dengan Google Sheet.');
     } else {
