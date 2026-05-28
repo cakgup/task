@@ -1,0 +1,20 @@
+name: Sync to GitLab
+
+on:
+  push:
+    branches:
+      - main  # Ganti 'master' jika branch utama Anda masih bernama master
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to GitLab
+        run: |
+          git remote add gitlab https://cakgup:${{ secrets.GITLAB_TOKEN }}@gitlab.com/cakgup/task.git
+          git push --force --prune gitlab main
