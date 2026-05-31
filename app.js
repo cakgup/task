@@ -2,6 +2,9 @@ const $ = (id) => document.getElementById(id);
 
 const cfg = window.CAKGUP_CONFIG || { API_URL: '', DEFAULT_PARENT_EMAIL: 'cakgup' };
 const POINT_MULTIPLIER = 200;
+const DEFAULT_PRAYER_LOCATION = { cityId: '1301', label: 'DKI Jakarta' };
+const PRAYER_LOCATION_KEY = 'cakgupPrayerLocation';
+const PRAYER_SCHEDULE_CACHE_KEY = 'cakgupPrayerScheduleCache';
 
 let session = readSession();
 let activeTab = 'dashboard';
@@ -15,6 +18,8 @@ let redemptions = [];
 let account = null;
 let captchas = {};
 let dailyRefreshTimer = null;
+let prayerRefreshTimer = null;
+let deferredInstallPrompt = null;
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
@@ -118,6 +123,7 @@ function init() {
   }).format(new Date());
 
   initPrayerTimes();
+  initInstallPrompt();
   bindEvents();
   loadAllCaptchas();
 
@@ -179,6 +185,8 @@ function bindEvents() {
   $('cancelRedeemBtn').addEventListener('click', closeRedeemDialog);
 
   $('refreshAccountBtn').addEventListener('click', loadAccount);
+  $('prayerLocationBtn')?.addEventListener('click', detectPrayerLocation);
+  $('installAppBtn')?.addEventListener('click', handleInstallClick);
   $('accountProfileForm').addEventListener('submit', saveAccountProfile);
   $('accountEmailForm').addEventListener('submit', saveAccountEmail);
   $('accountPasswordForm').addEventListener('submit', saveAccountPassword);
@@ -360,11 +368,15 @@ function applyRoleUi() {
   $('heroTitle').textContent = isParent() ? `Halo, ${user.headOfFamily || 'Kepala Keluarga'}!` : `Halo, ${user.childName}!`;
   $('heroSubtitle').textContent = isParent()
     ? 'Kelola tugas, tagihan, anak, template, dan persetujuan pencairan poin.'
-    : 'Kamu hanya dapat melihat tugasmu sendiri dan mengajukan pencairan poin.';
+    : '"Disiplin kecil hari ini di halaman tugasmu adalah kunci kesuksesan besar di masa depanmu."';
+  $('heroSubtitle').classList.toggle('quote-text', isChild());
 
   document.querySelectorAll('[data-parent-only]').forEach((el) => {
     el.hidden = !isParent();
   });
+
+  const filterChildWrap = $('filterChildWrap');
+  if (filterChildWrap) filterChildWrap.hidden = isChild();
 
   $('childRedeemAction').hidden = !isChild();
   if (isChild() && ['bills', 'add', 'manage', 'account'].includes(activeTab)) openTab('dashboard');
@@ -605,14 +617,7 @@ function taskCard(task) {
        <button class="icon-btn danger" onclick="deleteTask('${escapeJs(task.id)}')" title="Hapus">&#10005;</button>`
     : '';
 
-  return `<article class="task-card chore-card">
-    <h3>${escapeHtml(task.judul)}</h3>
-    <p class="task-description">
-      <span>Beban: ${task.beban}</span>
-      <strong class="task-points">${task.beban * POINT_MULTIPLIER} poin jika selesai</strong>
-      ${task.deskripsi ? `<span>${escapeHtml(task.deskripsi)}</span>` : ''}
-    </p>
-    <div class="meta">
+  const parentMeta = `<div class="meta">
       <span class="pill">${escapeHtml(task.namaAnak)}</span>
       <span class="pill">${escapeHtml(task.tanggalTugas)}</span>
       <span class="pill status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span>
@@ -620,7 +625,24 @@ function taskCard(task) {
         <button onclick="setTaskStatus('${escapeJs(task.id)}','${nextStatus}')">${isDone ? 'Batalkan' : 'Selesai'}</button>
         ${editButtons}
       </div>
-    </div>
+    </div>`;
+
+  const childMeta = `<div class="task-child-meta">
+      <p class="task-inline-text">Penugasan tanggal ${escapeHtml(formatShortDate(task.tanggalTugas))}</p>
+      <p class="task-inline-text">Status <span class="pill status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span></p>
+      <div class="actions chore-actions child-task-actions">
+        <button onclick="setTaskStatus('${escapeJs(task.id)}','${nextStatus}')">${isDone ? 'Batalkan' : 'Selesai'}</button>
+      </div>
+    </div>`;
+
+  return `<article class="task-card chore-card">
+    <h3>${escapeHtml(task.judul)}</h3>
+    <p class="task-description">
+      <span>Beban: ${task.beban}</span>
+      <strong class="task-points">${task.beban * POINT_MULTIPLIER} poin jika selesai</strong>
+      ${task.deskripsi ? `<span>${escapeHtml(task.deskripsi)}</span>` : ''}
+    </p>
+    ${isChild() ? childMeta : parentMeta}
   </article>`;
 }
 
@@ -1124,6 +1146,17 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+function formatShortDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }).format(date);
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
     '&': '&amp;',
@@ -1150,6 +1183,51 @@ function nextPrayerIndex(times) {
   return index >= 0 ? index : 1;
 }
 
+function readJsonStorage(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn('Gagal menyimpan localStorage', error);
+  }
+}
+
+function getStoredPrayerLocation() {
+  return readJsonStorage(PRAYER_LOCATION_KEY, DEFAULT_PRAYER_LOCATION) || DEFAULT_PRAYER_LOCATION;
+}
+
+function setPrayerCaption(label) {
+  const cityLabel = label || DEFAULT_PRAYER_LOCATION.label;
+  $('prayerCaption').textContent = `Waktu Shalat ${cityLabel} dan Sekitarnya`;
+}
+
+function setPrayerHelperText(message) {
+  const helper = $('prayerHelperText');
+  if (helper) helper.textContent = message;
+}
+
+function setPrayerLocationButtonLabel(label) {
+  const el = $('prayerLocationBtnText');
+  if (!el) return;
+  el.textContent = label || 'Lokasi';
+}
+
+function getPrayerScheduleCache() {
+  return readJsonStorage(PRAYER_SCHEDULE_CACHE_KEY, {}) || {};
+}
+
+function setPrayerScheduleCache(cache) {
+  writeJsonStorage(PRAYER_SCHEDULE_CACHE_KEY, cache);
+}
+
 function renderPrayerTimes(times, sourceLabel = 'fallback lokal') {
   const container = $('loginPrayerTimes');
   if (!container) return;
@@ -1162,35 +1240,181 @@ function renderPrayerTimes(times, sourceLabel = 'fallback lokal') {
   `).join('');
 }
 
-async function fetchPrayerTimes() {
+function prayerTimesFromSchedule(jadwal) {
+  return [
+    { name: 'Imsak', time: jadwal.imsak },
+    { name: 'Subuh', time: jadwal.subuh },
+    { name: 'Terbit', time: jadwal.terbit },
+    { name: 'Dzuhur', time: jadwal.dzuhur },
+    { name: 'Ashar', time: jadwal.ashar },
+    { name: 'Maghrib', time: jadwal.maghrib },
+    { name: 'Isya', time: jadwal.isya }
+  ];
+}
+
+async function fetchPrayerTimesForLocation(locationInfo = DEFAULT_PRAYER_LOCATION) {
+  const location = { ...DEFAULT_PRAYER_LOCATION, ...(locationInfo || {}) };
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const cacheKey = `${location.cityId}-${year}-${month}-${day}`;
+
+  setPrayerCaption(location.label);
+  setPrayerLocationButtonLabel(location.label);
+
+  const cache = getPrayerScheduleCache();
+  if (cache[cacheKey]?.times) {
+    renderPrayerTimes(cache[cacheKey].times, `Cache jadwal shalat ${location.label}`);
+    setPrayerHelperText(`Jadwal shalat menyesuaikan lokasi ${location.label}.`);
+    return cache[cacheKey].times;
+  }
+
   renderPrayerTimes(fallbackPrayerTimes, 'Jadwal fallback lokal');
   try {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const response = await fetch(`https://api.myquran.com/v2/sholat/jadwal/1301/${year}/${month}/${day}`, { cache: 'no-store' });
+    const response = await fetch(`https://api.myquran.com/v2/sholat/jadwal/${encodeURIComponent(location.cityId)}/${year}/${month}/${day}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
     const jadwal = result?.data?.jadwal;
-    if (!jadwal) return;
-    renderPrayerTimes([
-      { name: 'Imsak', time: jadwal.imsak },
-      { name: 'Subuh', time: jadwal.subuh },
-      { name: 'Terbit', time: jadwal.terbit },
-      { name: 'Dzuhur', time: jadwal.dzuhur },
-      { name: 'Ashar', time: jadwal.ashar },
-      { name: 'Maghrib', time: jadwal.maghrib },
-      { name: 'Isya', time: jadwal.isya }
-    ], 'API jadwal shalat DKI Jakarta');
+    if (!jadwal) throw new Error('Jadwal tidak ditemukan');
+    const times = prayerTimesFromSchedule(jadwal);
+    cache[cacheKey] = { times, cachedAt: new Date().toISOString(), label: location.label };
+    setPrayerScheduleCache(cache);
+    renderPrayerTimes(times, `API jadwal shalat ${location.label}`);
+    setPrayerHelperText(`Jadwal shalat menyesuaikan lokasi ${location.label}.`);
+    return times;
   } catch (error) {
     console.warn('Gagal mengambil jadwal shalat; menggunakan fallback lokal.', error);
+    setPrayerHelperText(`Gagal memuat jadwal ${location.label}. Menampilkan jadwal cadangan sementara.`);
+    renderPrayerTimes(fallbackPrayerTimes, `Fallback ${location.label}`);
+    return fallbackPrayerTimes;
   }
 }
 
+async function reverseGeocode(lat, lon) {
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&accept-language=id`, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+async function searchPrayerCity(query) {
+  if (!query) return null;
+  const response = await fetch(`https://api.myquran.com/v2/sholat/kota/cari/${encodeURIComponent(query)}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const result = await response.json();
+  const rows = result?.data || result?.results || [];
+  const first = Array.isArray(rows) ? rows[0] : null;
+  if (!first) return null;
+  return {
+    cityId: String(first.id || first.id_kota || first.city_id || first.kode || ''),
+    label: first.lokasi || first.nama || first.city || query
+  };
+}
+
+async function resolvePrayerLocationFromGps(position) {
+  const { latitude, longitude } = position.coords;
+  const geo = await reverseGeocode(latitude, longitude);
+  const address = geo?.address || {};
+  const candidates = [
+    address.city_district,
+    address.city,
+    address.town,
+    address.county,
+    address.municipality,
+    address.state,
+    geo?.name
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const city = await searchPrayerCity(candidate);
+      if (city?.cityId) return city;
+    } catch (error) {
+      console.warn('Pencarian kota shalat gagal untuk kandidat:', candidate, error);
+    }
+  }
+
+  throw new Error('Wilayah jadwal shalat tidak ditemukan dari lokasi GPS.');
+}
+
+async function detectPrayerLocation() {
+  if (!navigator.geolocation) {
+    setPrayerHelperText('Browser ini belum mendukung deteksi lokasi.');
+    return;
+  }
+
+  const button = $('prayerLocationBtn');
+  const originalText = $('prayerLocationBtnText')?.textContent || 'Lokasi';
+  if (button) button.disabled = true;
+  setPrayerLocationButtonLabel('Mencari...');
+  setPrayerHelperText('Mengambil koordinat GPS Anda...');
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 300000
+      });
+    });
+    const location = await resolvePrayerLocationFromGps(position);
+    writeJsonStorage(PRAYER_LOCATION_KEY, location);
+    await fetchPrayerTimesForLocation(location);
+  } catch (error) {
+    console.warn('Deteksi lokasi gagal:', error);
+    setPrayerHelperText('Izin lokasi ditolak atau lokasi belum dapat dibaca. Jadwal default tetap digunakan.');
+    setPrayerLocationButtonLabel(originalText);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function isStandaloneMode() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function updateInstallButton() {
+  const button = $('installAppBtn');
+  if (!button) return;
+  button.hidden = isStandaloneMode() || !deferredInstallPrompt;
+}
+
+function initInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    updateInstallButton();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    updateInstallButton();
+    setPrayerHelperText('Aplikasi berhasil dipasang. Anda bisa membukanya langsung dari layar utama.');
+  });
+
+  updateInstallButton();
+}
+
+async function handleInstallClick() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  try {
+    await deferredInstallPrompt.userChoice;
+  } catch (error) {
+    console.warn('Prompt install gagal dibuka', error);
+  }
+  deferredInstallPrompt = null;
+  updateInstallButton();
+}
+
 function initPrayerTimes() {
-  fetchPrayerTimes();
-  setInterval(fetchPrayerTimes, 60 * 60 * 1000);
+  const location = getStoredPrayerLocation();
+  fetchPrayerTimesForLocation(location);
+  if (prayerRefreshTimer) clearInterval(prayerRefreshTimer);
+  prayerRefreshTimer = setInterval(() => fetchPrayerTimesForLocation(getStoredPrayerLocation()), 60 * 60 * 1000);
 }
 
 function startDailyRefresh() {

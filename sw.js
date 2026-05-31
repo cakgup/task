@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tugas-keluarga-v1';
+const CACHE_NAME = 'tugas-keluarga-v2';
 
 const APP_ASSETS = [
   './',

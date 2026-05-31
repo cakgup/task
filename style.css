@@ -52,10 +52,14 @@ h1 { max-width: 760px; margin: 0; color: #fff; font-size: clamp(44px, 8vw, 88px)
 h2 { margin: 0 0 16px; color: var(--blue-3); font-size: 24px; }
 h3 { margin: 0; color: var(--blue-3); }
 .subtitle { max-width: 690px; margin: 18px 0 24px; color: rgba(255,255,255,.82); font-size: 1.04rem; line-height: 1.65; }
+.login-utility { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px; }
+.utility-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 10px 14px; color: #fff; background: rgba(8, 25, 50, .34); border: 1px solid rgba(255, 202, 26, .28); border-radius: 16px; box-shadow: 0 14px 28px rgba(8, 25, 50, .18); }
+.utility-btn:hover, .utility-btn:focus-visible { background: rgba(8, 25, 50, .5); }
+.utility-btn[hidden] { display: none !important; }
 
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: clamp(18px, 4vw, 56px); }
 .login-shell { width: min(100%, 1120px); display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(340px, .72fr); gap: clamp(18px, 4vw, 34px); align-items: center; }
-.login-copy { color: #fff; min-width: 0; }
+.login-copy { position: relative; color: #fff; min-width: 0; }
 .brand-lockup { display: flex; align-items: center; gap: 14px; margin-bottom: clamp(24px, 5vw, 54px); }
 .brand-mark { display: grid; place-items: center; flex: 0 0 auto; width: 58px; height: 58px; color: var(--blue); background: var(--yellow); border-radius: 22px; box-shadow: 0 18px 44px rgba(255, 202, 26, .32); font-weight: 950; }
 .brand-lockup strong { display: block; color: #fff; font-size: 1.02rem; }
@@ -80,6 +84,7 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 
 .login-prayer-widget { max-width: 860px; padding: 13px; border: 1px solid rgba(255, 202, 26, .22); border-radius: 20px; background: rgba(8, 25, 50, .28); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
 .prayer-caption { margin-bottom: 9px; color: rgba(255,255,255,.86); font-size: 11px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; text-align: center; }
+.prayer-helper-text { margin: 0 0 12px; color: rgba(255,255,255,.7); font-size: 12px; line-height: 1.5; text-align: center; }
 .prayer-strip { display: grid; grid-template-columns: repeat(7, minmax(62px, 1fr)); gap: 6px; }
 .prayer-time-item { display: grid; gap: 2px; min-height: 50px; padding: 7px 6px; border: 1px solid rgba(255,255,255,.11); border-radius: 14px; background: rgba(7, 24, 49, .48); text-align: center; }
 .prayer-time-item span { color: rgba(255,255,255,.66); font-size: 10px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
@@ -95,10 +100,11 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .hero-date { margin: 0; color: var(--muted); font-size: 14px; font-weight: 850; }
 .hero h1 { color: var(--blue-3); font-size: clamp(30px, 4.6vw, 54px); text-shadow: none; }
 .hero-motivation { max-width: 680px; margin: 8px 0 0; color: var(--muted); font-size: clamp(14px, 2vw, 17px); line-height: 1.45; }
+.hero-motivation.quote-text { font-style: italic; font-weight: 700; }
 .icon-btn, .small-btn { color: var(--blue); background: var(--yellow); white-space: nowrap; }
 .icon-btn.danger, .danger, button.danger { background: #fee2e2; color: #991b1b; }
 
-.tabs { position: sticky; top: 10px; z-index: 3; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 10px; margin-bottom: 12px; background: rgba(8, 25, 50, .58); backdrop-filter: blur(14px); }
+.tabs { position: sticky; top: 10px; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; padding: 10px; margin-bottom: 12px; background: rgba(8, 25, 50, .58); backdrop-filter: blur(14px); }
 .tabs button { flex: 0 1 auto; min-width: 112px; min-height: 42px; padding: 10px 16px; color: rgba(255,255,255,.78); background: transparent; border-radius: 999px; font-size: 13px; }
 .tabs button.active { color: var(--blue); background: var(--yellow); box-shadow: 0 10px 24px rgba(255, 202, 26, .18); }
 
@@ -145,6 +151,7 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .score-card small { color: var(--muted); font-weight: 700; }
 
 .form-row, .filters { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.filter-item { min-width: 0; }
 .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .bill-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
 .bill-stats { grid-template-columns: repeat(3, 1fr); }
@@ -173,6 +180,9 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .actions button.danger { color: var(--danger); background: #f6e2de; }
 
 .task-description { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.task-child-meta { display: grid; gap: 10px; margin-top: 10px; }
+.task-inline-text { margin: 0; color: var(--muted); font-size: 14px; font-weight: 700; }
+.child-task-actions { margin-top: 0; justify-content: flex-start; }
 .chore-card { display: grid; gap: 6px; padding: 13px 14px; }
 .chore-card .meta { margin: 0; align-items: center; }
 .chore-actions { display: flex; align-items: center; gap: 8px; flex: 1 1 240px; justify-content: flex-end; margin: 0 0 0 auto; }
@@ -217,6 +227,8 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 
 @media (max-width: 640px) {
   .login-page { padding: 14px; align-items: start; }
+  .login-utility { justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px; }
+  .utility-btn { min-height: 38px; padding: 9px 12px; font-size: 12px; }
   .brand-lockup { margin-bottom: 24px; }
   .login-card { padding: 20px; border-radius: 24px; }
   .auth-card.compact-auth .auth-panel { display: none !important; }

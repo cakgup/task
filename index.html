@@ -20,6 +20,14 @@
   <div id="loginPage" class="login-page">
     <section class="login-shell">
       <div class="login-copy">
+        <div class="login-utility" aria-label="Kontrol cepat aplikasi">
+          <button id="prayerLocationBtn" type="button" class="utility-btn" title="Deteksi lokasi untuk jadwal shalat">
+            <span aria-hidden="true">📍</span><span id="prayerLocationBtnText">Lokasi</span>
+          </button>
+          <button id="installAppBtn" type="button" class="utility-btn" hidden>
+            <span aria-hidden="true">⬇️</span><span>Install</span>
+          </button>
+        </div>
         <div class="brand-lockup">
           <span class="brand-mark">CG</span>
           <span>
@@ -31,8 +39,9 @@
         <h1>Tugas Keluarga</h1>
         <p class="subtitle">Atur tugas harian, tagihan, poin anak, dan template keluarga dengan isolasi data per keluarga.</p>
 
-        <section class="login-prayer-widget" aria-label="Jadwal shalat DKI Jakarta dan sekitarnya">
-          <div class="prayer-caption">Waktu Shalat DKI Jakarta dan Sekitarnya</div>
+        <section class="login-prayer-widget" aria-label="Jadwal shalat sesuai lokasi pengguna">
+          <div class="prayer-caption" id="prayerCaption">Waktu Shalat DKI Jakarta dan Sekitarnya</div>
+          <p id="prayerHelperText" class="prayer-helper-text">Jadwal awal menggunakan wilayah default. Tekan tombol Lokasi agar menyesuaikan posisi Anda.</p>
           <div class="prayer-strip" id="loginPrayerTimes">
             <div class="prayer-time-item is-loading"><span>Memuat</span><strong>--:--</strong></div>
           </div>
@@ -136,13 +145,19 @@
         <button id="refreshBtn" class="small-btn">Muat ulang</button>
       </div>
       <div class="filters">
-        <select id="filterChild"><option value="all">Semua Anak</option></select>
-        <input id="filterTaskDate" type="date" aria-label="Filter tanggal tugas" />
+        <div id="filterChildWrap" class="filter-item">
+          <select id="filterChild"><option value="all">Semua Anak</option></select>
+        </div>
+        <div class="filter-item">
+          <input id="filterTaskDate" type="date" aria-label="Filter tanggal tugas" />
+        </div>
+        <div class="filter-item">
         <select id="filterStatus">
           <option value="all">Semua Status</option>
           <option>Belum</option>
           <option>Selesai</option>
         </select>
+        </div>
       </div>
       <div id="taskList" class="task-list"></div>
     </section>
