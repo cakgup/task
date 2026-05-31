@@ -395,7 +395,7 @@ async function loadBootstrap() {
     isParent() ? loadAccount() : Promise.resolve()
   ]);
   render();
-  setStatus('Data tersinkron dari Cloudflare D1.');
+  setStatus('Data tersinkron dari server');
 }
 
 async function loadChildren() {
