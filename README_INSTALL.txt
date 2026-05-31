@@ -40,3 +40,9 @@ Jika database D1 sudah pernah dibuat dengan schema multi-tenant versi awal, jala
   task-api/migration_update_2026_05_31.sql
 
 Jika deploy dari awal, cukup jalankan schema.sql terbaru.
+
+HOTFIX FOREIGN KEY 31 Mei 2026:
+Jika saat login muncul error:
+  D1_ERROR: FOREIGN KEY constraint failed
+maka deploy ulang Worker dari paket ini. Jika database lama masih bermasalah, jalankan:
+  npx wrangler d1 execute task-db --file=./migration_hotfix_fk_2026_05_31.sql --remote
