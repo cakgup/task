@@ -1,11 +1,16 @@
 window.CAKGUP_CONFIG = {
   APP_PASSWORD: 'cakgup',
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbwAnUNUSxouDzo0PIElIJZ5-TaK831lIGDYfURyGDM9iX8kycIDzwcVDW0Tx13jQMhMLA/exec',
+  
+  // Arahkan GAS_URL lama Anda langsung ke endpoint Cloudflare Workers yang baru
+  GAS_URL: 'https://task-api.cakgup.workers.dev',
+
   CHILDREN: [
     { id: 'anak1', name: 'Fatiyyah', school: 'SMA Kelas 2' },
     { id: 'anak2', name: 'Alifah', school: 'SMA Kelas 1' },
     { id: 'anak3', name: 'Fatih', school: 'SMP Kelas 1' }
   ],
+  
+  // Jadikan daftar array di bawah ini sebagai template master harian & bulanan
   DAILY_TASKS: [
     { child: 'Alifah', title: 'Mencuci baju', load: 4, category: 'Pekerjaan Rumah' },
     { child: 'Fatiyyah', title: 'Mencuci piring', load: 2, category: 'Pekerjaan Rumah' },
