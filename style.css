@@ -20,6 +20,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 html { background: var(--blue-3); }
 
 body {
@@ -42,7 +43,7 @@ body {
 button, input, select, textarea { font: inherit; }
 button { border: 0; min-height: 44px; padding: 12px 16px; border-radius: 999px; font-weight: 900; cursor: pointer; }
 button:disabled { cursor: wait; opacity: .72; }
-input, select, textarea { width: 100%; margin-top: 7px; border: 1px solid var(--line-soft); border-radius: 16px; padding: 14px 15px; color: var(--ink); background: rgba(255,255,255,.92); outline: none; }
+input, select, textarea { width: 100%; margin-top: 7px; border: 1px solid var(--line-soft); border-radius: 16px; padding: 14px 15px; color: var(--ink); background: rgba(255,255,255,.92); outline: none; font-weight: 400; }
 input:focus, select:focus, textarea:focus { border-color: rgba(255, 202, 26, .9); box-shadow: 0 0 0 4px rgba(255, 202, 26, .22); }
 label { color: #34445d; font-size: 13px; font-weight: 850; }
 .login-form label, .task-form label { display: grid; gap: .35rem; font-weight: 800; color: #1f2937; }
@@ -56,6 +57,8 @@ h3 { margin: 0; color: var(--blue-3); }
 .utility-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 10px 14px; color: #fff; background: rgba(8, 25, 50, .34); border: 1px solid rgba(255, 202, 26, .28); border-radius: 16px; box-shadow: 0 14px 28px rgba(8, 25, 50, .18); }
 .utility-btn:hover, .utility-btn:focus-visible { background: rgba(8, 25, 50, .5); }
 .utility-btn[hidden] { display: none !important; }
+.install-btn.install-ready { background: rgba(255, 202, 26, .96); color: var(--blue); }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: clamp(18px, 4vw, 56px); }
 .login-shell { width: min(100%, 1120px); display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(340px, .72fr); gap: clamp(18px, 4vw, 34px); align-items: center; }
@@ -82,9 +85,12 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .captcha-row { display: grid; grid-template-columns: 1fr minmax(100px, 140px); gap: .6rem; align-items: center; border: 1px solid rgba(15, 23, 42, .12); border-radius: 16px; padding: .55rem .7rem; background: rgba(255, 255, 255, .72); }
 .captcha-row span { font-weight: 900; color: #12366d; }
 
-.login-prayer-widget { max-width: 860px; padding: 13px; border: 1px solid rgba(255, 202, 26, .22); border-radius: 20px; background: rgba(8, 25, 50, .28); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
-.prayer-caption { margin-bottom: 9px; color: rgba(255,255,255,.86); font-size: 11px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; text-align: center; }
-.prayer-helper-text { margin: 0 0 12px; color: rgba(255,255,255,.7); font-size: 12px; line-height: 1.5; text-align: center; }
+.login-prayer-widget { position: relative; max-width: 860px; padding: 13px; border: 1px solid rgba(255, 202, 26, .22); border-radius: 20px; background: rgba(8, 25, 50, .28); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
+.prayer-widget-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.prayer-widget-copy { min-width: 0; }
+.prayer-caption { margin-bottom: 8px; color: rgba(255,255,255,.9); font-size: 11px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; text-align: left; }
+.prayer-helper-text { margin: 0; color: rgba(255,255,255,.72); font-size: 12px; line-height: 1.5; text-align: left; }
+.prayer-location-btn { flex: 0 0 44px; width: 44px; min-height: 44px; padding: 0; justify-content: center; border-radius: 15px; font-size: 18px; }
 .prayer-strip { display: grid; grid-template-columns: repeat(7, minmax(62px, 1fr)); gap: 6px; }
 .prayer-time-item { display: grid; gap: 2px; min-height: 50px; padding: 7px 6px; border: 1px solid rgba(255,255,255,.11); border-radius: 14px; background: rgba(7, 24, 49, .48); text-align: center; }
 .prayer-time-item span { color: rgba(255,255,255,.66); font-size: 10px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
@@ -183,6 +189,15 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .task-child-meta { display: grid; gap: 10px; margin-top: 10px; }
 .task-inline-text { margin: 0; color: var(--muted); font-size: 14px; font-weight: 700; }
 .child-task-actions { margin-top: 0; justify-content: flex-start; }
+.child-compact-card { padding: 14px 16px; }
+.child-compact-card h3 { margin-bottom: 8px; }
+.compact-child-meta { gap: 8px; }
+.task-compact-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.task-compact-row-date .task-inline-text { font-weight: 800; }
+.task-compact-row-action { justify-content: space-between; gap: 12px; }
+.task-compact-row-action .task-inline-text { display: inline-flex; align-items: center; gap: 8px; }
+.child-compact-card .task-points { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px; background: rgba(255, 202, 26, .95); color: var(--blue); box-shadow: 0 10px 24px rgba(255, 202, 26, .22); }
+.child-compact-card .actions button { min-height: 40px; padding: 10px 18px; }
 .chore-card { display: grid; gap: 6px; padding: 13px 14px; }
 .chore-card .meta { margin: 0; align-items: center; }
 .chore-actions { display: flex; align-items: center; gap: 8px; flex: 1 1 240px; justify-content: flex-end; margin: 0 0 0 auto; }
@@ -213,6 +228,8 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .dialog-card { width: min(92vw, 440px); display: grid; gap: 14px; padding: 24px; border: 1px solid rgba(255, 202, 26, .26); border-radius: 24px; background: rgba(255,255,255,.96); box-shadow: var(--shadow); }
 .dialog-card h2 { margin-bottom: 0; }
 .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.install-guide-list { margin: 0; padding-left: 20px; color: var(--muted); line-height: 1.55; font-size: 14px; }
+.install-guide-list li + li { margin-top: 8px; }
 
 @media (max-width: 900px) {
   .login-shell { grid-template-columns: 1fr; }
@@ -227,7 +244,7 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 
 @media (max-width: 640px) {
   .login-page { padding: 14px; align-items: start; }
-  .login-utility { justify-content: flex-start; flex-wrap: wrap; margin-bottom: 16px; }
+  .login-utility { justify-content: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
   .utility-btn { min-height: 38px; padding: 9px 12px; font-size: 12px; }
   .brand-lockup { margin-bottom: 24px; }
   .login-card { padding: 20px; border-radius: 24px; }
@@ -254,5 +271,7 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 }
 
 @media (max-width: 360px) {
+  .prayer-widget-head { align-items: flex-start; }
+  .prayer-location-btn { flex-basis: 40px; width: 40px; min-height: 40px; }
   .prayer-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

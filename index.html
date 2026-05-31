@@ -21,10 +21,7 @@
     <section class="login-shell">
       <div class="login-copy">
         <div class="login-utility" aria-label="Kontrol cepat aplikasi">
-          <button id="prayerLocationBtn" type="button" class="utility-btn" title="Deteksi lokasi untuk jadwal shalat">
-            <span aria-hidden="true">📍</span><span id="prayerLocationBtnText">Lokasi</span>
-          </button>
-          <button id="installAppBtn" type="button" class="utility-btn" hidden>
+          <button id="installAppBtn" type="button" class="utility-btn install-btn">
             <span aria-hidden="true">⬇️</span><span>Install</span>
           </button>
         </div>
@@ -35,13 +32,20 @@
             <small>Multi-tenant family workspace</small>
           </span>
         </div>
-        <p class="eyebrow">Ruang keluarga</p>
+        <p class="eyebrow">Ruang Motivasi</p>
         <h1>Tugas Keluarga</h1>
-        <p class="subtitle">Atur tugas harian, tagihan, poin anak, dan template keluarga dengan isolasi data per keluarga.</p>
+        <p class="subtitle">Ciptakan rumah lebih teratur! Atur tugas anak lebih seru, dan agenda penting dalam satu aplikasi.</p>
 
         <section class="login-prayer-widget" aria-label="Jadwal shalat sesuai lokasi pengguna">
-          <div class="prayer-caption" id="prayerCaption">Waktu Shalat DKI Jakarta dan Sekitarnya</div>
-          <p id="prayerHelperText" class="prayer-helper-text">Jadwal awal menggunakan wilayah default. Tekan tombol Lokasi agar menyesuaikan posisi Anda.</p>
+          <div class="prayer-widget-head">
+            <div class="prayer-widget-copy">
+              <div class="prayer-caption" id="prayerCaption">Waktu Shalat DKI Jakarta dan Sekitarnya</div>
+              <p id="prayerHelperText" class="prayer-helper-text">Jadwal awal menggunakan wilayah default. Tekan ikon lokasi agar menyesuaikan posisi Anda.</p>
+            </div>
+            <button id="prayerLocationBtn" type="button" class="utility-btn prayer-location-btn" title="Deteksi lokasi untuk jadwal shalat" aria-label="Deteksi lokasi untuk jadwal shalat">
+              <span aria-hidden="true">📍</span><span id="prayerLocationBtnText" class="sr-only">Lokasi</span>
+            </button>
+          </div>
           <div class="prayer-strip" id="loginPrayerTimes">
             <div class="prayer-time-item is-loading"><span>Memuat</span><strong>--:--</strong></div>
           </div>
@@ -360,6 +364,19 @@
         <button type="submit" class="primary">Kirim Pengajuan</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="installHelpDialog" class="app-dialog">
+    <div class="dialog-card install-guide-card">
+      <h2>Install Aplikasi</h2>
+      <p class="form-hint">Jika tombol install bawaan browser belum muncul, gunakan menu browser untuk memasang aplikasi ke layar utama.</p>
+      <ul class="install-guide-list">
+        <li><strong>Chrome Android:</strong> buka menu titik tiga, lalu pilih <em>Install app</em> atau <em>Tambahkan ke layar utama</em>.</li>
+        <li><strong>Safari iPhone:</strong> tekan tombol <em>Share</em>, lalu pilih <em>Add to Home Screen</em>.</li>
+        <li><strong>Desktop:</strong> buka alamat aplikasi melalui HTTPS, lalu gunakan ikon install di address bar bila tersedia.</li>
+      </ul>
+      <button id="closeInstallHelpBtn" type="button" class="primary">Mengerti</button>
+    </div>
   </dialog>
 
   <script src="config.js"></script>

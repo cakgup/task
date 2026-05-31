@@ -31,7 +31,6 @@ const apiBase = () => (cfg.API_URL || cfg.GAS_URL || '').replace(/\/$/, '');
 const fallbackPrayerTimes = [
   { name: 'Imsak', time: '04:15' },
   { name: 'Subuh', time: '04:25' },
-  { name: 'Terbit', time: '05:42' },
   { name: 'Dzuhur', time: '11:41' },
   { name: 'Ashar', time: '15:02' },
   { name: 'Maghrib', time: '17:47' },
@@ -187,6 +186,7 @@ function bindEvents() {
   $('refreshAccountBtn').addEventListener('click', loadAccount);
   $('prayerLocationBtn')?.addEventListener('click', detectPrayerLocation);
   $('installAppBtn')?.addEventListener('click', handleInstallClick);
+  $('closeInstallHelpBtn')?.addEventListener('click', closeInstallGuide);
   $('accountProfileForm').addEventListener('submit', saveAccountProfile);
   $('accountEmailForm').addEventListener('submit', saveAccountEmail);
   $('accountPasswordForm').addEventListener('submit', saveAccountPassword);
@@ -526,7 +526,7 @@ function renderDashboard() {
     : children;
 
   $('dashboardSubheading').textContent = isChild()
-    ? 'Lihat progresmu, ajukan pencairan sebagian poin, dan bandingkan semangat dengan saudara.'
+    ? '"Lihat hebatnya progresmu hari ini! Cairkan poin impianmu, lalu ajak saudaramu buat seru-seruan bareng!"'
     : 'Klik nama anak untuk melihat penugasan harian.';
 
   $('childrenSummary').innerHTML = visibleChildren.length
@@ -627,22 +627,30 @@ function taskCard(task) {
       </div>
     </div>`;
 
-  const childMeta = `<div class="task-child-meta">
-      <p class="task-inline-text">Penugasan tanggal ${escapeHtml(formatShortDate(task.tanggalTugas))}</p>
-      <p class="task-inline-text">Status <span class="pill status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span></p>
-      <div class="actions chore-actions child-task-actions">
-        <button onclick="setTaskStatus('${escapeJs(task.id)}','${nextStatus}')">${isDone ? 'Batalkan' : 'Selesai'}</button>
+  const childMeta = `<div class="task-child-meta compact-child-meta">
+      <div class="task-compact-row task-compact-row-info">
+        <span class="task-inline-text">Beban: ${task.beban}</span>
+        <strong class="task-points">${task.beban * POINT_MULTIPLIER} poin jika selesai</strong>
+        ${task.deskripsi ? `<span class="task-inline-text">${escapeHtml(task.deskripsi)}</span>` : ''}
+      </div>
+      <div class="task-compact-row task-compact-row-date">
+        <span class="task-inline-text">Penugasan tanggal ${escapeHtml(formatShortDate(task.tanggalTugas))}</span>
+      </div>
+      <div class="task-compact-row task-compact-row-action">
+        <span class="task-inline-text">Status <span class="pill status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span></span>
+        <div class="actions chore-actions child-task-actions">
+          <button onclick="setTaskStatus('${escapeJs(task.id)}','${nextStatus}')">${isDone ? 'Batalkan' : 'Selesai'}</button>
+        </div>
       </div>
     </div>`;
 
-  return `<article class="task-card chore-card">
+  return `<article class="task-card chore-card ${isChild() ? 'child-compact-card' : ''}">
     <h3>${escapeHtml(task.judul)}</h3>
-    <p class="task-description">
+    ${isChild() ? childMeta : `<p class="task-description">
       <span>Beban: ${task.beban}</span>
       <strong class="task-points">${task.beban * POINT_MULTIPLIER} poin jika selesai</strong>
       ${task.deskripsi ? `<span>${escapeHtml(task.deskripsi)}</span>` : ''}
-    </p>
-    ${isChild() ? childMeta : parentMeta}
+    </p>${parentMeta}`}
   </article>`;
 }
 
@@ -1216,8 +1224,13 @@ function setPrayerHelperText(message) {
 
 function setPrayerLocationButtonLabel(label) {
   const el = $('prayerLocationBtnText');
-  if (!el) return;
-  el.textContent = label || 'Lokasi';
+  const button = $('prayerLocationBtn');
+  const safeLabel = label || 'Lokasi';
+  if (el) el.textContent = safeLabel;
+  if (button) {
+    button.title = `Deteksi lokasi untuk jadwal shalat${safeLabel === 'Lokasi' ? '' : `: ${safeLabel}`}`;
+    button.setAttribute('aria-label', button.title);
+  }
 }
 
 function getPrayerScheduleCache() {
@@ -1244,7 +1257,6 @@ function prayerTimesFromSchedule(jadwal) {
   return [
     { name: 'Imsak', time: jadwal.imsak },
     { name: 'Subuh', time: jadwal.subuh },
-    { name: 'Terbit', time: jadwal.terbit },
     { name: 'Dzuhur', time: jadwal.dzuhur },
     { name: 'Ashar', time: jadwal.ashar },
     { name: 'Maghrib', time: jadwal.maghrib },
@@ -1379,7 +1391,8 @@ function isStandaloneMode() {
 function updateInstallButton() {
   const button = $('installAppBtn');
   if (!button) return;
-  button.hidden = isStandaloneMode() || !deferredInstallPrompt;
+  button.hidden = isStandaloneMode();
+  button.classList.toggle('install-ready', Boolean(deferredInstallPrompt));
 }
 
 function initInstallPrompt() {
@@ -1399,15 +1412,30 @@ function initInstallPrompt() {
 }
 
 async function handleInstallClick() {
-  if (!deferredInstallPrompt) return;
+  if (!deferredInstallPrompt) {
+    showInstallGuide();
+    return;
+  }
   deferredInstallPrompt.prompt();
   try {
     await deferredInstallPrompt.userChoice;
   } catch (error) {
     console.warn('Prompt install gagal dibuka', error);
+    showInstallGuide();
   }
   deferredInstallPrompt = null;
   updateInstallButton();
+}
+
+function showInstallGuide() {
+  const dialog = $('installHelpDialog');
+  if (dialog?.showModal) dialog.showModal();
+  else alert('Untuk install aplikasi: buka menu browser, lalu pilih Install app atau Tambahkan ke layar utama.');
+}
+
+function closeInstallGuide() {
+  const dialog = $('installHelpDialog');
+  if (dialog?.close) dialog.close();
 }
 
 function initPrayerTimes() {
