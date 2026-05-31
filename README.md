@@ -64,3 +64,7 @@ PIN awal: 1234
 ## Catatan Keamanan
 
 Password, PIN, token sesi, dan captcha tidak disimpan dalam bentuk polos. Backend menyimpan hash SHA-256 bersalt untuk password/PIN dan hash token untuk sesi. Untuk produksi besar, disarankan menambahkan rate limiting berbasis IP/user-agent di Cloudflare WAF atau Durable Object.
+
+## Update 31 Mei 2026
+
+Versi ini menambahkan UI mobile login ringkas, menu Akun, tagihan rutin/non-rutin, alarm jatuh tempo, pencairan poin sebagian, papan semangat keluarga untuk akun anak, dan navigasi yang lebih rapi. Untuk database existing, jalankan migration tambahan di `task-api/migration_update_2026_05_31.sql` sebelum deploy Worker terbaru.

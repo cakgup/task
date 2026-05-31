@@ -34,3 +34,9 @@ CATATAN PENTING
 - Captcha matematika dibuat dan divalidasi di server Cloudflare Worker.
 - Akun anak tidak bisa membuka modul Tagihan, Tambah, dan Master.
 - Cron Worker diset pada 17:00 UTC, setara 00:00 WIB, untuk reset/seeding harian.
+
+UPDATE 31 Mei 2026:
+Jika database D1 sudah pernah dibuat dengan schema multi-tenant versi awal, jalankan file:
+  task-api/migration_update_2026_05_31.sql
+
+Jika deploy dari awal, cukup jalankan schema.sql terbaru.

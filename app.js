@@ -12,6 +12,7 @@ let taskSummary = { stats: { total: 0, done: 0, pending: 0 }, children: {} };
 let taskTemplates = [];
 let billTemplates = [];
 let redemptions = [];
+let account = null;
 let captchas = {};
 let dailyRefreshTimer = null;
 
@@ -173,7 +174,15 @@ function bindEvents() {
   $('resetBillTemplateForm').addEventListener('click', resetBillTemplateForm);
 
   $('refreshRedemptionsBtn').addEventListener('click', loadRedemptions);
-  $('requestRedeemBtn').addEventListener('click', requestRedeem);
+  $('requestRedeemBtn').addEventListener('click', openRedeemDialog);
+  $('redeemForm').addEventListener('submit', submitRedeem);
+  $('cancelRedeemBtn').addEventListener('click', closeRedeemDialog);
+
+  $('refreshAccountBtn').addEventListener('click', loadAccount);
+  $('accountProfileForm').addEventListener('submit', saveAccountProfile);
+  $('accountEmailForm').addEventListener('submit', saveAccountEmail);
+  $('accountPasswordForm').addEventListener('submit', saveAccountPassword);
+  $('logoutAllBtn').addEventListener('click', logoutAllSessions);
 
   $('childrenSummary').addEventListener('click', (event) => {
     if (event.target.closest('[data-redeem]')) return;
@@ -184,6 +193,7 @@ function bindEvents() {
 }
 
 function switchAuthTab(panelName) {
+  $('authCard')?.classList.remove('compact-auth');
   document.querySelectorAll('[data-auth-tab]').forEach((button) => {
     button.classList.toggle('active', button.dataset.authTab === panelName);
   });
@@ -323,6 +333,7 @@ async function logout() {
 function showLogin() {
   $('loginPage').hidden = false;
   $('app').hidden = true;
+  $('authCard')?.classList.add('compact-auth');
 }
 
 async function showApp() {
@@ -356,7 +367,7 @@ function applyRoleUi() {
   });
 
   $('childRedeemAction').hidden = !isChild();
-  if (isChild() && ['bills', 'add', 'manage'].includes(activeTab)) openTab('dashboard');
+  if (isChild() && ['bills', 'add', 'manage', 'account'].includes(activeTab)) openTab('dashboard');
 }
 
 async function loadBootstrap() {
@@ -368,7 +379,8 @@ async function loadBootstrap() {
     loadTaskSummary(),
     loadRedemptions(),
     isParent() ? loadBills() : Promise.resolve(),
-    isParent() ? loadTemplates() : Promise.resolve()
+    isParent() ? loadTemplates() : Promise.resolve(),
+    isParent() ? loadAccount() : Promise.resolve()
   ]);
   render();
   setStatus('Data tersinkron dari Cloudflare D1.');
@@ -431,6 +443,7 @@ async function loadBills() {
   const data = await apiGet('getBills', { month });
   bills = (data.data || []).map(normalizeBill);
   renderBills();
+  renderDashboard();
 }
 
 async function loadTemplates() {
@@ -450,8 +463,15 @@ async function loadRedemptions() {
   renderRedemptions();
 }
 
+async function loadAccount() {
+  if (!isParent()) return;
+  const data = await apiGet('getAccount');
+  account = data.data || null;
+  renderAccount();
+}
+
 function openTab(id) {
-  if (!isParent() && ['bills', 'add', 'manage'].includes(id)) id = 'dashboard';
+  if (!isParent() && ['bills', 'add', 'manage', 'account'].includes(id)) id = 'dashboard';
   activeTab = id;
 
   document.querySelectorAll('.tabs button').forEach((button) => {
@@ -477,6 +497,7 @@ function render() {
   if (activeTab === 'tasks') renderTasks();
   if (activeTab === 'bills') renderBills();
   if (activeTab === 'manage') renderManage();
+  if (activeTab === 'account') renderAccount();
   if (activeTab === 'redemptions') renderRedemptions();
 }
 
@@ -486,30 +507,82 @@ function renderDashboard() {
   $('statDone').textContent = stats.done || 0;
   $('statPending').textContent = stats.pending || 0;
 
+  renderBillAlerts();
+
   const visibleChildren = isChild()
     ? children.filter((child) => child.name === session.user.childName)
     : children;
 
+  $('dashboardSubheading').textContent = isChild()
+    ? 'Lihat progresmu, ajukan pencairan sebagian poin, dan bandingkan semangat dengan saudara.'
+    : 'Klik nama anak untuk melihat penugasan harian.';
+
   $('childrenSummary').innerHTML = visibleChildren.length
     ? visibleChildren.map((child) => {
-      const summary = taskSummary.children?.[child.name] || { total: 0, done: 0, points: 0, earnedPoints: 0, pendingRedemptionPoints: 0 };
+      const summary = taskSummary.children?.[child.name] || { total: 0, done: 0, points: 0, balancePoints: 0, earnedPoints: 0, pendingRedemptionPoints: 0 };
       const pct = summary.total ? Math.round((summary.done || 0) / summary.total * 100) : 0;
       const action = isChild()
-        ? `<button class="redeem-btn" data-redeem onclick="requestRedeem()">Ajukan</button>`
+        ? `<button class="redeem-btn" data-redeem onclick="openRedeemDialog()">Ajukan</button>`
         : '';
       return `<article class="child-card child-card-button" data-child-name="${escapeHtml(child.name)}" tabindex="0">
         <div class="child-card-head">
           <h3>${escapeHtml(child.name)}</h3>
           <div class="child-point-actions">
-            <strong class="points-badge">${summary.points || 0} poin</strong>
+            <strong class="points-badge">${summary.points || 0} poin tersedia</strong>
             ${action}
           </div>
         </div>
-        <p>${escapeHtml(child.schoolLevel || '-')} · ${summary.done || 0}/${summary.total || 0} tugas selesai · pending cair ${summary.pendingRedemptionPoints || 0}</p>
+        <p>${escapeHtml(child.schoolLevel || '-')} · ${summary.done || 0}/${summary.total || 0} tugas selesai · saldo ${summary.balancePoints ?? summary.points ?? 0} · pending cair ${summary.pendingRedemptionPoints || 0}</p>
         <div class="progress"><span style="width:${pct}%"></span></div>
       </article>`;
     }).join('')
-    : '<article class="task-card">Belum ada anak. Tambahkan akun anak pada menu Master.</article>';
+    : '<article class="task-card">Belum ada anak. Tambahkan akun anak pada menu Master Data.</article>';
+
+  renderFamilyScoreboard();
+}
+
+function renderBillAlerts() {
+  const box = $('billAlertBox');
+  if (!box) return;
+  if (!isParent()) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  const alertBills = bills
+    .filter((bill) => bill.status !== 'Sudah Dibayar' && ['overdue', 'today', 'soon'].includes(bill.dueStatus))
+    .sort((a, b) => (a.daysToDue ?? 99) - (b.daysToDue ?? 99));
+  box.hidden = alertBills.length === 0;
+  box.innerHTML = alertBills.length
+    ? `<h3>Alarm Tagihan</h3>${alertBills.slice(0, 5).map((bill) => `<p><strong>${escapeHtml(bill.nama)}</strong> · ${escapeHtml(bill.dueMessage)} · ${escapeHtml(bill.jatuhTempo || '-')}</p>`).join('')}`
+    : '';
+}
+
+function renderFamilyScoreboard() {
+  const box = $('familyScoreboard');
+  if (!box) return;
+  if (!isChild()) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  const rows = Object.entries(taskSummary.children || {})
+    .map(([name, summary]) => ({ name, ...summary }))
+    .sort((a, b) => (b.points || 0) - (a.points || 0));
+  box.hidden = rows.length <= 1;
+  box.innerHTML = rows.length > 1
+    ? `<h2>Papan Semangat Keluarga</h2><p>Ringkasan poin saudara hanya untuk motivasi. Detail tugas tetap pribadi.</p>
+       <div class="scoreboard-list">${rows.map((row, index) => {
+         const pct = row.total ? Math.round((row.done || 0) / row.total * 100) : 0;
+         const self = row.name === session.user.childName;
+         return `<article class="score-card ${self ? 'self' : ''}">
+           <span class="rank">#${index + 1}</span>
+           <strong>${escapeHtml(row.name)}${self ? ' · Kamu' : ''}</strong>
+           <small>${row.points || 0} poin tersedia · ${row.done || 0}/${row.total || 0} tugas</small>
+           <div class="progress"><span style="width:${pct}%"></span></div>
+         </article>`;
+       }).join('')}</div>`
+    : '';
 }
 
 function renderTasks() {
@@ -631,7 +704,8 @@ function renderBills() {
 function billCard(bill) {
   const isPaid = bill.status === 'Sudah Dibayar';
   const nextStatus = isPaid ? 'Belum Dibayar' : 'Sudah Dibayar';
-  return `<article class="task-card bill-card">
+  const dueBadge = bill.dueMessage ? `<span class="pill due-${escapeHtml(bill.dueStatus)}">${escapeHtml(bill.dueMessage)}</span>` : '';
+  return `<article class="task-card bill-card ${bill.dueStatus ? `due-card-${escapeHtml(bill.dueStatus)}` : ''}">
     <div class="bill-main">
       <label class="bill-check">
         <input type="checkbox" ${isPaid ? 'checked' : ''} onchange="setBillStatus('${escapeJs(bill.id)}','${nextStatus}')" />
@@ -644,6 +718,9 @@ function billCard(bill) {
       <div class="meta bill-meta">
         <span class="pill">${escapeHtml(bill.bulan)}</span>
         <span class="pill">Jatuh tempo: ${escapeHtml(bill.jatuhTempo || '-')}</span>
+        <span class="pill">${bill.isRecurring ? 'Rutin bulanan' : 'Sekali saja'}</span>
+        ${bill.reminderEnabled ? `<span class="pill">Alarm H-${bill.reminderDaysBefore || 0}</span>` : '<span class="pill">Alarm off</span>'}
+        ${dueBadge}
         <span class="pill status-${escapeHtml(bill.status.replace(/\s+/g, '-'))}">${escapeHtml(bill.status)}</span>
       </div>
       <div class="actions bill-actions">
@@ -659,6 +736,7 @@ async function saveBill(event) {
   if (!isParent()) return;
   const id = $('billId').value || uid('bil');
   const existing = bills.find((item) => item.id === id);
+  const kind = document.querySelector('input[name="billKind"]:checked')?.value || 'one_time';
   const bill = {
     id,
     nama: $('billName').value.trim(),
@@ -666,13 +744,17 @@ async function saveBill(event) {
     jatuhTempo: $('billDueDate').value,
     status: existing?.status || 'Belum Dibayar',
     catatan: $('billNote').value.trim(),
-    waktuBayar: existing?.waktuBayar || ''
+    waktuBayar: existing?.waktuBayar || '',
+    isRecurring: kind === 'recurring',
+    reminderEnabled: $('billReminderEnabled').checked,
+    reminderDaysBefore: Number($('billReminderDaysBefore').value || 0),
+    createdFromTemplateId: existing?.createdFromTemplateId || ''
   };
   await apiPost(existing ? 'updateBill' : 'addBill', { bill });
   resetBillForm();
-  await loadBills();
+  await Promise.all([loadBills(), loadTemplates()]);
   openTab('bills');
-  setStatus('Tagihan tersimpan.');
+  setStatus(bill.isRecurring ? 'Tagihan rutin tersimpan dan template bulanan diperbarui.' : 'Tagihan sekali saja tersimpan.');
 }
 
 function editBill(id) {
@@ -683,6 +765,10 @@ function editBill(id) {
   $('billMonth').value = bill.bulan;
   $('billDueDate').value = bill.jatuhTempo || today();
   $('billNote').value = bill.catatan || '';
+  const kind = bill.isRecurring ? 'recurring' : 'one_time';
+  document.querySelectorAll('input[name="billKind"]').forEach((input) => { input.checked = input.value === kind; });
+  $('billReminderEnabled').checked = bill.reminderEnabled !== false;
+  $('billReminderDaysBefore').value = String(bill.reminderDaysBefore ?? 1);
   openTab('add');
 }
 
@@ -697,6 +783,7 @@ async function setBillStatus(id, status) {
     }
   });
   await loadBills();
+  renderDashboard();
   setStatus('Status tagihan diperbarui.');
 }
 
@@ -704,6 +791,7 @@ async function deleteBill(id) {
   if (!isParent() || !confirm('Hapus tagihan ini?')) return;
   await apiPost('deleteBill', { id });
   await loadBills();
+  renderDashboard();
   setStatus('Tagihan dihapus.');
 }
 
@@ -712,6 +800,9 @@ function resetBillForm() {
   $('billId').value = '';
   $('billMonth').value = currentMonth();
   $('billDueDate').value = today();
+  $('billReminderEnabled').checked = true;
+  $('billReminderDaysBefore').value = '1';
+  document.querySelectorAll('input[name="billKind"]').forEach((input) => { input.checked = input.value === 'one_time'; });
 }
 
 async function saveChild(event) {
@@ -786,7 +877,11 @@ async function saveBillTemplate(event) {
     template: {
       templateId: $('billTemplateId').value,
       name: $('billTemplateName').value.trim(),
-      note: $('billTemplateNote').value.trim()
+      note: $('billTemplateNote').value.trim(),
+      dueDay: Number($('billTemplateDueDay').value || 28),
+      reminderEnabled: $('billTemplateReminderEnabled').checked,
+      reminderDaysBefore: Number($('billTemplateReminderDaysBefore').value || 1),
+      isActive: $('billTemplateIsActive').checked
     }
   });
   resetBillTemplateForm();
@@ -800,6 +895,10 @@ function editBillTemplate(id) {
   $('billTemplateId').value = item.templateId;
   $('billTemplateName').value = item.name;
   $('billTemplateNote').value = item.note || '';
+  $('billTemplateDueDay').value = item.dueDay || 28;
+  $('billTemplateReminderEnabled').checked = item.reminderEnabled !== false;
+  $('billTemplateReminderDaysBefore').value = String(item.reminderDaysBefore ?? 1);
+  $('billTemplateIsActive').checked = item.isActive !== false;
 }
 
 async function deleteBillTemplate(id) {
@@ -811,6 +910,10 @@ async function deleteBillTemplate(id) {
 function resetBillTemplateForm() {
   $('billTemplateForm').reset();
   $('billTemplateId').value = '';
+  $('billTemplateDueDay').value = 28;
+  $('billTemplateReminderEnabled').checked = true;
+  $('billTemplateReminderDaysBefore').value = '1';
+  $('billTemplateIsActive').checked = true;
 }
 
 function renderManage() {
@@ -837,23 +940,53 @@ function renderManage() {
     ? '<article class="mini-card">Akun cakgup memakai 15 template tagihan lama yang dikunci di backend.</article>'
     : (billTemplates.length ? billTemplates.map((item) => `<article class="mini-card">
         <strong>${escapeHtml(item.name)}</strong>
-        <span>${escapeHtml(item.note || '-')}</span>
+        <span>${escapeHtml(item.note || '-')} · tanggal ${item.dueDay || 28} · ${item.reminderEnabled ? `alarm H-${item.reminderDaysBefore || 0}` : 'alarm off'} · ${item.isActive ? 'aktif' : 'nonaktif'}</span>
         <div class="actions"><button onclick="editBillTemplate('${escapeJs(item.templateId)}')">Edit</button><button class="danger" onclick="deleteBillTemplate('${escapeJs(item.templateId)}')">Hapus</button></div>
       </article>`).join('') : '<article class="mini-card">Belum ada template tagihan.</article>');
 }
 
-async function requestRedeem() {
-  if (!isChild()) return;
+function getCurrentChildAvailablePoints() {
   const summary = taskSummary.children?.[session.user.childName] || { points: 0 };
-  const points = Number(summary.points || 0);
+  return Number(summary.points || 0);
+}
+
+function openRedeemDialog() {
+  if (!isChild()) return;
+  const points = getCurrentChildAvailablePoints();
   if (points <= 0) {
-    setStatus('Belum ada poin yang dapat diajukan.');
+    setStatus('Belum ada poin yang dapat diajukan. Selesaikan tugas dulu, ya.');
     return;
   }
-  if (!confirm(`Ajukan pencairan ${points} poin kepada orang tua?`)) return;
-  await apiPost('requestRedeem', { points, note: 'Pengajuan dari akun anak' });
+  $('redeemAvailableText').textContent = `Poin tersedia: ${points}`;
+  $('redeemPointsInput').max = String(points);
+  $('redeemPointsInput').value = String(Math.floor(points / 1000) * 1000 || points);
+  $('redeemNoteInput').value = '';
+  if ($('redeemDialog').showModal) $('redeemDialog').showModal();
+  else $('redeemDialog').setAttribute('open', 'open');
+}
+
+function closeRedeemDialog() {
+  if ($('redeemDialog').close) $('redeemDialog').close();
+  else $('redeemDialog').removeAttribute('open');
+}
+
+async function submitRedeem(event) {
+  event.preventDefault();
+  if (!isChild()) return;
+  const available = getCurrentChildAvailablePoints();
+  const points = Number($('redeemPointsInput').value || 0);
+  if (!Number.isInteger(points) || points <= 0) {
+    setStatus('Nominal poin harus angka bulat lebih dari 0.');
+    return;
+  }
+  if (points > available) {
+    setStatus(`Poin tersedia hanya ${available}.`);
+    return;
+  }
+  await apiPost('requestRedeem', { points, note: $('redeemNoteInput').value.trim() });
+  closeRedeemDialog();
   await Promise.all([loadTaskSummary(), loadRedemptions()]);
-  setStatus('Pengajuan pencairan dikirim. Menunggu persetujuan orang tua.');
+  setStatus(`Pengajuan pencairan ${points} poin dikirim. Menunggu persetujuan orang tua.`);
   openTab('redemptions');
 }
 
@@ -879,6 +1012,59 @@ function renderRedemptions() {
       </article>`;
     }).join('')
     : '<article class="task-card">Belum ada pengajuan pencairan.</article>';
+}
+
+function renderAccount() {
+  if (!isParent() || !account) return;
+  $('accountHeadOfFamily').value = account.head_of_family || session.user.headOfFamily || '';
+  $('accountFamilyId').value = account.family_id || session.user.familyId || '';
+  $('accountEmail').value = account.email || session.user.email || '';
+  $('accountCreatedAt').value = formatDateTime(account.created_at || '');
+}
+
+async function saveAccountProfile(event) {
+  event.preventDefault();
+  if (!isParent()) return;
+  const data = await apiPost('updateAccountProfile', { headOfFamily: $('accountHeadOfFamily').value.trim() });
+  if (data.user) {
+    saveSession({ ...session, user: { ...session.user, ...data.user } });
+    applyRoleUi();
+  }
+  await loadAccount();
+  setStatus('Profil keluarga diperbarui.');
+}
+
+async function saveAccountEmail(event) {
+  event.preventDefault();
+  if (!isParent()) return;
+  const data = await apiPost('updateAccountEmail', {
+    email: $('accountEmail').value.trim(),
+    currentPassword: $('accountEmailPassword').value
+  });
+  if (data.user) saveSession({ ...session, user: { ...session.user, ...data.user } });
+  $('accountEmailPassword').value = '';
+  applyRoleUi();
+  await loadAccount();
+  setStatus('Email login diperbarui. Sesi lain telah dikeluarkan.');
+}
+
+async function saveAccountPassword(event) {
+  event.preventDefault();
+  if (!isParent()) return;
+  await apiPost('updateAccountPassword', {
+    currentPassword: $('accountCurrentPassword').value,
+    newPassword: $('accountNewPassword').value,
+    confirmPassword: $('accountConfirmPassword').value
+  });
+  $('accountPasswordForm').reset();
+  setStatus('Password diperbarui. Sesi lain telah dikeluarkan.');
+}
+
+async function logoutAllSessions() {
+  if (!isParent() || !confirm('Logout dari semua perangkat? Anda juga perlu login kembali di perangkat ini.')) return;
+  await apiPost('logoutAll');
+  clearSession();
+  showLogin();
 }
 
 function labelRedemption(status) {
@@ -907,7 +1093,15 @@ function normalizeBill(row) {
     status: row.status === 'Sudah Dibayar' ? 'Sudah Dibayar' : 'Belum Dibayar',
     catatan: row.catatan || row.note || '',
     waktuBayar: row.waktuBayar || row.waktu_bayar || '',
-    jatuhTempo: row.jatuhTempo || row.jatuh_tempo || ''
+    jatuhTempo: row.jatuhTempo || row.jatuh_tempo || '',
+    isRecurring: row.isRecurring === true || row.is_recurring === 1,
+    reminderEnabled: row.reminderEnabled !== false && row.reminder_enabled !== 0,
+    reminderDaysBefore: Number(row.reminderDaysBefore ?? row.reminder_days_before ?? 0),
+    reminderSentAt: row.reminderSentAt || row.reminder_sent_at || '',
+    createdFromTemplateId: row.createdFromTemplateId || row.created_from_template_id || '',
+    dueStatus: row.dueStatus || 'normal',
+    dueMessage: row.dueMessage || '',
+    daysToDue: row.daysToDue ?? null
   };
 }
 
@@ -1022,7 +1216,7 @@ window.editTaskTemplate = editTaskTemplate;
 window.deleteTaskTemplate = deleteTaskTemplate;
 window.editBillTemplate = editBillTemplate;
 window.deleteBillTemplate = deleteBillTemplate;
-window.requestRedeem = requestRedeem;
+window.openRedeemDialog = openRedeemDialog;
 window.decideRedeem = decideRedeem;
 
 init();

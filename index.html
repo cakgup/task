@@ -39,7 +39,7 @@
         </section>
       </div>
 
-      <section class="login-card auth-card">
+      <section id="authCard" class="login-card auth-card compact-auth">
         <div class="login-card-head">
           <h2>Masuk / Registrasi</h2>
           <p>Pilih mode akses sesuai peran.</p>
@@ -106,9 +106,10 @@
       <button data-tab="dashboard" class="active">Beranda</button>
       <button data-tab="tasks">Tugas</button>
       <button data-tab="bills" data-parent-only>Tagihan</button>
-      <button data-tab="add" data-parent-only>Tambah</button>
-      <button data-tab="manage" data-parent-only>Master</button>
       <button data-tab="redemptions">Pencairan</button>
+      <button data-tab="account" data-parent-only>Akun</button>
+      <button data-tab="add" data-parent-only>Tambah Data</button>
+      <button data-tab="manage" data-parent-only>Master Data</button>
     </nav>
 
     <section id="syncStatus" class="sync-status">Memuat sesi...</section>
@@ -119,11 +120,13 @@
         <article class="stat-card"><span id="statDone">0</span><small>Selesai</small></article>
         <article class="stat-card"><span id="statPending">0</span><small>Belum</small></article>
       </div>
+      <div id="billAlertBox" class="alert-box" hidden></div>
       <div class="children-heading">
         <h2 id="dashboardHeading">Yuk kumpulkan poin!</h2>
         <p id="dashboardSubheading">Klik nama anak untuk melihat penugasan harian.</p>
       </div>
       <div id="childrenSummary" class="children-summary"></div>
+      <section id="familyScoreboard" class="scoreboard" hidden></section>
       <p class="children-encouragement">Poin baru dapat dicairkan setelah pengajuan anak disetujui oleh orang tua.</p>
     </section>
 
@@ -200,6 +203,21 @@
               <label>Jatuh Tempo<input id="billDueDate" type="date" required /></label>
             </div>
             <label>Catatan<textarea id="billNote" rows="2" placeholder="Opsional"></textarea></label>
+            <fieldset class="choice-fieldset">
+              <legend>Jenis tagihan</legend>
+              <label class="radio-card"><input type="radio" name="billKind" value="one_time" checked /> Sekali saja</label>
+              <label class="radio-card"><input type="radio" name="billKind" value="recurring" /> Rutin bulanan</label>
+            </fieldset>
+            <label class="check-row"><input id="billReminderEnabled" type="checkbox" checked /> Aktifkan alarm jatuh tempo</label>
+            <label>Ingatkan sebelum jatuh tempo
+              <select id="billReminderDaysBefore">
+                <option value="0">Hari H</option>
+                <option value="1" selected>H-1</option>
+                <option value="3">H-3</option>
+                <option value="7">H-7</option>
+              </select>
+            </label>
+            <p class="form-hint">Jika dipilih rutin bulanan, tagihan juga disimpan sebagai template dan muncul otomatis pada bulan berikutnya.</p>
             <button type="submit" class="primary">Simpan Tagihan</button>
             <button type="button" id="resetBillForm" class="secondary">Kosongkan</button>
           </form>
@@ -242,10 +260,63 @@
             <input type="hidden" id="billTemplateId" />
             <label>Nama Tagihan<input id="billTemplateName" required /></label>
             <label>Catatan<input id="billTemplateNote" placeholder="Contoh: Pendidikan & Sekolah" /></label>
+            <div class="form-row">
+              <label>Tanggal jatuh tempo bulanan<input id="billTemplateDueDay" type="number" min="1" max="31" value="28" required /></label>
+              <label>Pengingat
+                <select id="billTemplateReminderDaysBefore">
+                  <option value="0">Hari H</option>
+                  <option value="1" selected>H-1</option>
+                  <option value="3">H-3</option>
+                  <option value="7">H-7</option>
+                </select>
+              </label>
+            </div>
+            <label class="check-row"><input id="billTemplateReminderEnabled" type="checkbox" checked /> Aktifkan alarm jatuh tempo</label>
+            <label class="check-row"><input id="billTemplateIsActive" type="checkbox" checked /> Template aktif untuk generate bulan berikutnya</label>
             <button type="submit" class="primary">Simpan Template Tagihan</button>
             <button type="button" id="resetBillTemplateForm" class="secondary">Kosongkan</button>
           </form>
           <div id="billTemplateList" class="mini-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="account" class="panel">
+      <div class="section-head">
+        <h2>Pengaturan Akun</h2>
+        <button id="refreshAccountBtn" class="small-btn">Muat ulang</button>
+      </div>
+      <div class="form-stack account-grid">
+        <section class="form-section">
+          <h2>Profil Keluarga</h2>
+          <form id="accountProfileForm" class="task-form">
+            <label>Nama kepala keluarga<input id="accountHeadOfFamily" required /></label>
+            <label>Family ID<input id="accountFamilyId" readonly /></label>
+            <label>Terdaftar sejak<input id="accountCreatedAt" readonly /></label>
+            <button type="submit" class="primary">Simpan Profil</button>
+          </form>
+        </section>
+        <section class="form-section">
+          <h2>Ubah Email Login</h2>
+          <form id="accountEmailForm" class="task-form">
+            <label>Email baru<input id="accountEmail" type="email" required /></label>
+            <label>Kata sandi saat ini<input id="accountEmailPassword" type="password" autocomplete="current-password" required /></label>
+            <button type="submit" class="primary">Ubah Email</button>
+          </form>
+        </section>
+        <section class="form-section">
+          <h2>Ubah Password</h2>
+          <form id="accountPasswordForm" class="task-form">
+            <label>Password saat ini<input id="accountCurrentPassword" type="password" autocomplete="current-password" required /></label>
+            <label>Password baru<input id="accountNewPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Minimal 8 karakter, huruf dan angka" required /></label>
+            <label>Konfirmasi password baru<input id="accountConfirmPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+            <button type="submit" class="primary">Ubah Password</button>
+          </form>
+        </section>
+        <section class="form-section danger-zone">
+          <h2>Keamanan Sesi</h2>
+          <p class="form-hint">Gunakan fitur ini apabila akun pernah digunakan di perangkat lain.</p>
+          <button id="logoutAllBtn" type="button" class="secondary danger">Logout dari Semua Perangkat</button>
         </section>
       </div>
     </section>
@@ -262,6 +333,19 @@
       <div id="redemptionList" class="task-list"></div>
     </section>
   </main>
+
+  <dialog id="redeemDialog" class="app-dialog">
+    <form id="redeemForm" method="dialog" class="dialog-card">
+      <h2>Ajukan Pencairan Poin</h2>
+      <p id="redeemAvailableText" class="form-hint">Poin tersedia: 0</p>
+      <label>Nominal poin yang dicairkan<input id="redeemPointsInput" type="number" min="1" step="1" required /></label>
+      <label>Catatan untuk orang tua<textarea id="redeemNoteInput" rows="3" placeholder="Opsional, contoh: untuk membeli buku"></textarea></label>
+      <div class="dialog-actions">
+        <button id="cancelRedeemBtn" type="button" class="secondary">Batal</button>
+        <button type="submit" class="primary">Kirim Pengajuan</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="config.js"></script>
   <script src="app.js"></script>
