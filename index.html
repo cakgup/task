@@ -24,12 +24,12 @@
           <span class="brand-mark">CG</span>
           <span>
             <strong>Tugas Keluarga</strong>
-            <small>Ruang keluarga</small>
+            <small>Multi-tenant family workspace</small>
           </span>
         </div>
         <p class="eyebrow">Ruang keluarga</p>
         <h1>Tugas Keluarga</h1>
-        <p class="subtitle">Atur tugas rumah, belajar, dan kebiasaan harian keluarga dengan lebih mudah.</p>
+        <p class="subtitle">Atur tugas harian, tagihan, poin anak, dan template keluarga dengan isolasi data per keluarga.</p>
 
         <section class="login-prayer-widget" aria-label="Jadwal shalat DKI Jakarta dan sekitarnya">
           <div class="prayer-caption">Waktu Shalat DKI Jakarta dan Sekitarnya</div>
@@ -39,14 +39,51 @@
         </section>
       </div>
 
-      <section class="login-card">
+      <section class="login-card auth-card">
         <div class="login-card-head">
-          <h2>Masuk</h2>
+          <h2>Masuk / Registrasi</h2>
+          <p>Pilih mode akses sesuai peran.</p>
         </div>
-        <form id="loginForm" class="login-form">
-          <input id="password" type="password" placeholder="Masukkan kode akses" autocomplete="current-password" aria-label="Kode masuk" />
-          <button type="submit">Masuk</button>
-          <p id="loginError" class="error" hidden>Kode belum tepat.</p>
+
+        <div class="auth-tabs" role="tablist" aria-label="Mode autentikasi">
+          <button type="button" class="active" data-auth-tab="parentLoginPanel">Orang Tua</button>
+          <button type="button" data-auth-tab="childLoginPanel">Anak</button>
+          <button type="button" data-auth-tab="registerPanel">Registrasi</button>
+        </div>
+
+        <form id="parentLoginForm" class="login-form auth-panel active" data-panel="parentLoginPanel">
+          <label>Email keluarga<input id="parentEmail" type="text" autocomplete="username" placeholder="cakgup atau email keluarga" /></label>
+          <label>Kata sandi utama<input id="parentPassword" type="password" autocomplete="current-password" placeholder="Kata sandi keluarga" required /></label>
+          <div class="captcha-row">
+            <span id="parentCaptchaQuestion">Memuat...</span>
+            <input id="parentCaptchaAnswer" inputmode="numeric" placeholder="Jawaban" required />
+          </div>
+          <button type="submit">Masuk Orang Tua</button>
+          <p id="parentLoginError" class="error" hidden></p>
+        </form>
+
+        <form id="childLoginForm" class="login-form auth-panel" data-panel="childLoginPanel" hidden>
+          <label>Email keluarga<input id="childFamilyEmail" type="text" autocomplete="username" placeholder="cakgup atau email keluarga" /></label>
+          <label>Nama anak<input id="childLoginName" placeholder="Contoh: Fatih" required /></label>
+          <label>PIN anak<input id="childPin" type="password" inputmode="numeric" pattern="[0-9]{4,6}" autocomplete="current-password" placeholder="4–6 digit" required /></label>
+          <div class="captcha-row">
+            <span id="childCaptchaQuestion">Memuat...</span>
+            <input id="childCaptchaAnswer" inputmode="numeric" placeholder="Jawaban" required />
+          </div>
+          <button type="submit">Masuk Anak</button>
+          <p id="childLoginError" class="error" hidden></p>
+        </form>
+
+        <form id="registerForm" class="login-form auth-panel" data-panel="registerPanel" hidden>
+          <label>Nama Kepala Keluarga<input id="regHeadOfFamily" placeholder="Nama kepala keluarga" required /></label>
+          <label>Email keluarga<input id="regEmail" type="email" autocomplete="username" placeholder="email@domain.com" required /></label>
+          <label>Kata sandi utama<input id="regPassword" type="password" autocomplete="new-password" minlength="4" placeholder="Minimal 4 karakter" required /></label>
+          <div class="captcha-row">
+            <span id="registerCaptchaQuestion">Memuat...</span>
+            <input id="registerCaptchaAnswer" inputmode="numeric" placeholder="Jawaban" required />
+          </div>
+          <button type="submit">Daftar Keluarga Baru</button>
+          <p id="registerError" class="error" hidden></p>
         </form>
       </section>
     </section>
@@ -56,11 +93,11 @@
     <header class="hero">
       <div>
         <div class="hero-topline">
-          <p class="eyebrow">Tugas Keluarga</p>
+          <p class="eyebrow" id="roleLabel">Tugas Keluarga</p>
           <p id="todayLabel" class="hero-date">Memuat tanggal...</p>
         </div>
-        <h1>Semangat!</h1>
-        <p class="hero-motivation">Tugasmu hari ini adalah langkah kecil menuju impian besarmu esok hari</p>
+        <h1 id="heroTitle">Semangat!</h1>
+        <p id="heroSubtitle" class="hero-motivation">Data keluarga terisolasi berdasarkan akun masing-masing.</p>
       </div>
       <button id="logoutBtn" class="icon-btn">Keluar</button>
     </header>
@@ -68,72 +105,26 @@
     <nav class="tabs" aria-label="Menu utama">
       <button data-tab="dashboard" class="active">Beranda</button>
       <button data-tab="tasks">Tugas</button>
-      <button data-tab="bills">Tagihan</button>
-      <button data-tab="add">Tambah</button>
+      <button data-tab="bills" data-parent-only>Tagihan</button>
+      <button data-tab="add" data-parent-only>Tambah</button>
+      <button data-tab="manage" data-parent-only>Master</button>
+      <button data-tab="redemptions">Pencairan</button>
     </nav>
 
-    <section id="syncStatus" class="sync-status">Mode lokal aktif. Sinkronisasi belum diatur.</section>
+    <section id="syncStatus" class="sync-status">Memuat sesi...</section>
 
     <section id="dashboard" class="panel active">
       <div class="stats-grid">
         <article class="stat-card"><span id="statTotal">0</span><small>Total Hari Ini</small></article>
         <article class="stat-card"><span id="statDone">0</span><small>Selesai</small></article>
-        <article class="stat-card"><span id="statPending">0</span><small>Belum/Dikerjakan</small></article>
+        <article class="stat-card"><span id="statPending">0</span><small>Belum</small></article>
       </div>
       <div class="children-heading">
-        <h2>Yuk kumpulkan point!</h2>
-        <p>klik nama masing - masing untuk cek penugasan harian ya..</p>
+        <h2 id="dashboardHeading">Yuk kumpulkan poin!</h2>
+        <p id="dashboardSubheading">Klik nama anak untuk melihat penugasan harian.</p>
       </div>
       <div id="childrenSummary" class="children-summary"></div>
-      <p class="children-encouragement">
-        Lakukanlah yang terbaik dalam setiap tugasmu, karena Allah mencintai orang yang bersungguh-sungguh. Semangat mengumpulkan poin untuk pencapaianmu di akhir bulan!
-      </p>
-    </section>
-
-    <section id="add" class="panel">
-      <div class="form-stack">
-        <section class="form-section">
-          <h2>Tambah Daftar Tugas</h2>
-          <form id="taskForm" class="task-form">
-            <input type="hidden" id="taskId" />
-            <label>Judul Tugas<input id="title" required placeholder="Contoh: Menyapu ruang tamu" /></label>
-            <label>Anak
-              <select id="child" required></select>
-            </label>
-            <label>Kategori
-              <select id="category">
-                <option>Pekerjaan Rumah</option>
-                <option>Belajar</option>
-                <option>Ibadah/Kedisiplinan</option>
-                <option>Pribadi</option>
-                <option>Lainnya</option>
-              </select>
-            </label>
-            <label>Tanggal<input id="taskDate" type="date" required /></label>
-            <label>Beban
-              <input id="load" type="number" min="1" step="1" value="1" required placeholder="Contoh: 2" />
-            </label>
-            <label>Deskripsi<textarea id="description" rows="3" placeholder="Catatan singkat tugas"></textarea></label>
-            <button type="submit" class="primary">Simpan Tugas</button>
-            <button type="button" id="resetForm" class="secondary">Kosongkan</button>
-          </form>
-        </section>
-
-        <section class="form-section">
-          <h2>Tambah Tagihan</h2>
-          <form id="billForm" class="task-form bill-form">
-            <input type="hidden" id="billId" />
-            <label>Nama Tagihan<input id="billName" required placeholder="Contoh: SPP sekolah" /></label>
-            <div class="form-row">
-              <label>Bulan<input id="billMonth" type="month" required /></label>
-              <label>Jatuh Tempo<input id="billDueDate" type="date" required /></label>
-            </div>
-            <label>Catatan<textarea id="billNote" rows="2" placeholder="Opsional"></textarea></label>
-            <button type="submit" class="primary">Simpan Tagihan</button>
-            <button type="button" id="resetBillForm" class="secondary">Kosongkan</button>
-          </form>
-        </section>
-      </div>
+      <p class="children-encouragement">Poin baru dapat dicairkan setelah pengajuan anak disetujui oleh orang tua.</p>
     </section>
 
     <section id="tasks" class="panel">
@@ -164,7 +155,7 @@
         <button type="button" class="stat-card stat-filter" data-bill-filter="Belum Dibayar"><span id="billUnpaid">0</span><small>Belum Dibayar</small></button>
       </div>
       <div class="filters bill-filters">
-        <select id="filterBillMonth" aria-label="Filter bulan tagihan"></select>
+        <input id="filterBillMonth" type="month" aria-label="Filter bulan tagihan" />
         <select id="filterBillStatus" aria-label="Filter status tagihan">
           <option value="all">Semua Status</option>
           <option>Belum Dibayar</option>
@@ -173,18 +164,113 @@
       </div>
       <div id="billList" class="task-list"></div>
     </section>
+
+    <section id="add" class="panel">
+      <div class="form-stack">
+        <section class="form-section">
+          <h2>Tambah / Ubah Tugas</h2>
+          <form id="taskForm" class="task-form">
+            <input type="hidden" id="taskId" />
+            <label>Judul Tugas<input id="title" required placeholder="Contoh: Menyapu ruang tamu" /></label>
+            <label>Anak<select id="child" required></select></label>
+            <label>Kategori
+              <select id="category">
+                <option>Pekerjaan Rumah</option>
+                <option>Belajar</option>
+                <option>Ibadah/Kedisiplinan</option>
+                <option>Pribadi</option>
+                <option>Lainnya</option>
+              </select>
+            </label>
+            <label>Tanggal<input id="taskDate" type="date" required /></label>
+            <label>Beban<input id="load" type="number" min="1" step="1" value="1" required /></label>
+            <label>Deskripsi<textarea id="description" rows="3" placeholder="Catatan singkat tugas"></textarea></label>
+            <button type="submit" class="primary">Simpan Tugas</button>
+            <button type="button" id="resetForm" class="secondary">Kosongkan</button>
+          </form>
+        </section>
+
+        <section class="form-section">
+          <h2>Tambah / Ubah Tagihan</h2>
+          <form id="billForm" class="task-form bill-form">
+            <input type="hidden" id="billId" />
+            <label>Nama Tagihan<input id="billName" required placeholder="Contoh: SPP sekolah" /></label>
+            <div class="form-row">
+              <label>Bulan<input id="billMonth" type="month" required /></label>
+              <label>Jatuh Tempo<input id="billDueDate" type="date" required /></label>
+            </div>
+            <label>Catatan<textarea id="billNote" rows="2" placeholder="Opsional"></textarea></label>
+            <button type="submit" class="primary">Simpan Tagihan</button>
+            <button type="button" id="resetBillForm" class="secondary">Kosongkan</button>
+          </form>
+        </section>
+      </div>
+    </section>
+
+    <section id="manage" class="panel">
+      <div class="form-stack">
+        <section class="form-section">
+          <h2>Tambah Akun Anak</h2>
+          <form id="childForm" class="task-form">
+            <label>Nama Anak<input id="newChildName" required /></label>
+            <label>Tingkat/Kategori Sekolah<input id="newChildSchool" placeholder="Contoh: SD Kelas 5" /></label>
+            <label>PIN Anak<input id="newChildPin" type="password" inputmode="numeric" pattern="[0-9]{4,6}" placeholder="4–6 digit" required /></label>
+            <button type="submit" class="primary">Simpan Anak</button>
+          </form>
+          <div id="childrenList" class="mini-list"></div>
+        </section>
+
+        <section class="form-section">
+          <h2>Template Tugas Harian</h2>
+          <p class="form-hint">Untuk akun cakgup, template lama dipertahankan oleh sistem. Untuk tenant baru, isikan template di sini.</p>
+          <form id="taskTemplateForm" class="task-form">
+            <input type="hidden" id="taskTemplateId" />
+            <label>Anak<select id="templateChild" required></select></label>
+            <label>Judul Template<input id="templateTitle" required /></label>
+            <label>Beban<input id="templateLoad" type="number" min="1" value="1" required /></label>
+            <label>Kategori<input id="templateCategory" value="Pekerjaan Rumah" required /></label>
+            <label>Deskripsi<textarea id="templateDescription" rows="2"></textarea></label>
+            <button type="submit" class="primary">Simpan Template Tugas</button>
+            <button type="button" id="resetTaskTemplateForm" class="secondary">Kosongkan</button>
+          </form>
+          <div id="taskTemplateList" class="mini-list"></div>
+        </section>
+
+        <section class="form-section">
+          <h2>Template Tagihan Bulanan</h2>
+          <form id="billTemplateForm" class="task-form">
+            <input type="hidden" id="billTemplateId" />
+            <label>Nama Tagihan<input id="billTemplateName" required /></label>
+            <label>Catatan<input id="billTemplateNote" placeholder="Contoh: Pendidikan & Sekolah" /></label>
+            <button type="submit" class="primary">Simpan Template Tagihan</button>
+            <button type="button" id="resetBillTemplateForm" class="secondary">Kosongkan</button>
+          </form>
+          <div id="billTemplateList" class="mini-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="redemptions" class="panel">
+      <div class="section-head">
+        <h2>Pencairan Poin</h2>
+        <button id="refreshRedemptionsBtn" class="small-btn">Muat ulang</button>
+      </div>
+      <div id="childRedeemAction" class="redeem-action" hidden>
+        <p>Ajukan pencairan poin kepada orang tua. Poin tidak dikurangi sebelum disetujui.</p>
+        <button id="requestRedeemBtn" class="primary">Ajukan Cairkan Poin</button>
+      </div>
+      <div id="redemptionList" class="task-list"></div>
+    </section>
   </main>
 
   <script src="config.js"></script>
   <script src="app.js"></script>
-
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('./sw.js')
-          .catch(function (error) {
-            console.warn('Service Worker registration failed:', error);
-          });
+        navigator.serviceWorker.register('./sw.js').catch(function (error) {
+          console.warn('Service Worker registration failed:', error);
+        });
       });
     }
   </script>

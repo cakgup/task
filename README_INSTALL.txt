@@ -1,32 +1,36 @@
-TUGAS KELUARGA - PWA READY
+INSTALASI CEPAT - TASK FAMILY MULTI-TENANT CLOUDFARE D1
 
-Paket ini sudah siap diunggah ke GitHub Pages atau hosting HTTPS lain.
+1. Masuk folder backend:
+   cd task-api
 
-File penting:
-- index.html
-- manifest.webmanifest
-- sw.js
-- style.css
-- app.js
-- config.js
-- assets/icons/icon-192.png
-- assets/icons/icon-512.png
-- assets/icons/maskable-512.png
-- assets/icons/apple-touch-icon.png
+2. Terapkan skema database D1:
+   npx wrangler d1 execute task-db --file=./schema.sql --remote
 
-Cara deploy di GitHub Pages:
-1. Upload seluruh isi folder ini ke repository GitHub Pages.
-2. Pastikan file index.html berada di root repository atau root folder yang dipakai Pages.
-3. Buka URL GitHub Pages menggunakan HTTPS.
-4. Pada Chrome/Edge, klik ikon Install di address bar.
+3. Opsional: migrasikan data lama akun default cakgup:
+   npx wrangler d1 execute task-db --file=./migrasi_data_lama.sql --remote
 
-Jika sebelumnya sudah pernah membuka versi lama:
-1. Buka DevTools > Application > Service Workers.
-2. Klik Unregister pada service worker lama.
-3. Masuk ke Storage > Clear site data.
-4. Refresh halaman.
+4. Deploy Cloudflare Worker:
+   npx wrangler deploy
 
-Catatan:
-- Nama aplikasi pada manifest: Tugas Keluarga.
-- Service Worker: sw.js.
-- Manifest: manifest.webmanifest.
+5. Pastikan file task/config.js mengarah ke endpoint Worker yang benar:
+   window.CAKGUP_CONFIG = {
+     API_URL: 'https://task-api.cakgup.workers.dev',
+     DEFAULT_PARENT_EMAIL: 'cakgup'
+   };
+
+6. Upload folder task ke GitHub Pages atau hosting statis lain.
+
+AKUN DEFAULT CAKGUP
+- Login Orang Tua:
+  Email keluarga: cakgup
+  Password: cakgup
+- Login Anak default:
+  Email keluarga: cakgup
+  Nama anak: Fatiyyah / Alifah / Fatih
+  PIN awal: 1234
+
+CATATAN PENTING
+- Semua data utama sudah memakai family_id agar terisolasi per keluarga.
+- Captcha matematika dibuat dan divalidasi di server Cloudflare Worker.
+- Akun anak tidak bisa membuka modul Tagihan, Tambah, dan Master.
+- Cron Worker diset pada 17:00 UTC, setara 00:00 WIB, untuk reset/seeding harian.
