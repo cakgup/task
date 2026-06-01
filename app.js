@@ -21,6 +21,8 @@ let captchas = {};
 let dailyRefreshTimer = null;
 let prayerRefreshTimer = null;
 let deferredInstallPrompt = null;
+let chatSocket = null;
+let chatConnected = false;
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
@@ -192,6 +194,9 @@ function bindEvents() {
   $('accountEmailForm').addEventListener('submit', saveAccountEmail);
   $('accountPasswordForm').addEventListener('submit', saveAccountPassword);
   $('logoutAllBtn').addEventListener('click', logoutAllSessions);
+  $('chatToggleBtn')?.addEventListener('click', toggleChatPanel);
+  $('chatCloseBtn')?.addEventListener('click', closeChatPanel);
+  $('chatForm')?.addEventListener('submit', sendChatMessage);
 
   $('childrenSummary').addEventListener('click', (event) => {
     if (event.target.closest('[data-redeem]')) return;
@@ -335,6 +340,7 @@ async function logout() {
   } catch (error) {
     console.warn(error);
   }
+  teardownChatSocket();
   clearSession();
   location.reload();
 }
@@ -342,12 +348,15 @@ async function logout() {
 function showLogin() {
   $('loginPage').hidden = false;
   $('app').hidden = true;
+  $('floatingChat').hidden = true;
+  teardownChatSocket();
   $('authCard')?.classList.add('compact-auth');
 }
 
 async function showApp() {
   $('loginPage').hidden = true;
   $('app').hidden = false;
+  $('floatingChat').hidden = false;
 
   $('filterTaskDate').value = today();
   $('taskDate').value = today();
@@ -358,6 +367,7 @@ async function showApp() {
   resetBillTemplateForm();
 
   applyRoleUi();
+  initFloatingChat();
   await loadBootstrap();
   startDailyRefresh();
 }
@@ -1296,6 +1306,123 @@ function normalizeBill(row) {
     dueMessage: row.dueMessage || '',
     daysToDue: row.daysToDue ?? null
   };
+}
+
+function initFloatingChat() {
+  $('chatPanel').hidden = true;
+  $('chatMessages').innerHTML = '';
+  setChatStatus('Menghubungkan chat...');
+  connectFamilyChat();
+}
+
+function chatWsUrl() {
+  const base = apiBase();
+  if (!base || !session?.token) return '';
+  const url = new URL(base);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = '/chat/ws';
+  url.search = '';
+  url.searchParams.set('token', session.token);
+  return url.toString();
+}
+
+function connectFamilyChat() {
+  teardownChatSocket();
+  const wsUrl = chatWsUrl();
+  if (!wsUrl) {
+    setChatStatus('Chat belum siap.');
+    return;
+  }
+  try {
+    chatSocket = new WebSocket(wsUrl);
+  } catch (error) {
+    setChatStatus('Gagal membuka chat.');
+    return;
+  }
+
+  chatSocket.addEventListener('open', () => {
+    chatConnected = true;
+    setChatStatus('Terhubung');
+  });
+
+  chatSocket.addEventListener('message', (event) => {
+    let payload = {};
+    try {
+      payload = JSON.parse(String(event.data || '{}'));
+    } catch (error) {
+      return;
+    }
+    if (payload.type === 'history') {
+      (payload.items || []).forEach((item) => renderChatItem(item));
+      return;
+    }
+    renderChatItem(payload);
+  });
+
+  chatSocket.addEventListener('close', () => {
+    chatConnected = false;
+    setChatStatus('Terputus. Mencoba sambung ulang...');
+    setTimeout(() => {
+      if (session?.token) connectFamilyChat();
+    }, 2000);
+  });
+
+  chatSocket.addEventListener('error', () => {
+    setChatStatus('Koneksi chat error.');
+  });
+}
+
+function teardownChatSocket() {
+  if (chatSocket) {
+    try { chatSocket.close(); } catch (_) {}
+  }
+  chatSocket = null;
+  chatConnected = false;
+}
+
+function renderChatItem(item) {
+  const box = $('chatMessages');
+  if (!box || !item) return;
+  const kind = item.type || 'chat';
+  const mine = kind === 'chat' && item.from === (isChild() ? session.user.childName : session.user.headOfFamily);
+  const row = document.createElement('article');
+  row.className = `chat-item${mine ? ' mine' : ''}`;
+  if (kind === 'system') {
+    row.innerHTML = `<small>${escapeHtml(formatDateTime(item.sentAt || ''))}</small>${escapeHtml(item.text || '')}`;
+  } else {
+    row.innerHTML = `<strong>${escapeHtml(item.from || 'Pengguna')}</strong><br>${escapeHtml(item.text || '')}<small>${escapeHtml(formatDateTime(item.sentAt || ''))}</small>`;
+  }
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+}
+
+function setChatStatus(text) {
+  const el = $('chatStatus');
+  if (el) el.textContent = text;
+}
+
+function toggleChatPanel() {
+  if ($('chatPanel').hidden) {
+    $('chatPanel').hidden = false;
+  } else {
+    closeChatPanel();
+  }
+}
+
+function closeChatPanel() {
+  $('chatPanel').hidden = true;
+}
+
+function sendChatMessage(event) {
+  event.preventDefault();
+  const text = $('chatInput').value.trim();
+  if (!text) return;
+  if (!chatConnected || !chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
+    setChatStatus('Chat belum terhubung.');
+    return;
+  }
+  chatSocket.send(JSON.stringify({ text }));
+  $('chatInput').value = '';
 }
 
 function setStatus(message) {

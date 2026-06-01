@@ -423,6 +423,22 @@
     </div>
   </dialog>
 
+  <section id="floatingChat" class="floating-chat" hidden>
+    <button id="chatToggleBtn" type="button" class="floating-chat-toggle" aria-label="Buka chat keluarga">Chat</button>
+    <div id="chatPanel" class="floating-chat-panel" hidden>
+      <div class="floating-chat-head">
+        <strong>Chat Keluarga</strong>
+        <button id="chatCloseBtn" type="button" class="icon-btn">Tutup</button>
+      </div>
+      <div id="chatStatus" class="form-hint">Menyambungkan...</div>
+      <div id="chatMessages" class="floating-chat-messages"></div>
+      <form id="chatForm" class="floating-chat-form">
+        <input id="chatInput" type="text" maxlength="1000" placeholder="Tulis pesan..." required />
+        <button type="submit" class="primary">Kirim</button>
+      </form>
+    </div>
+  </section>
+
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
