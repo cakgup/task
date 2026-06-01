@@ -1542,8 +1542,7 @@ function getStoredPrayerLocation() {
 }
 
 function setPrayerCaption(label) {
-  const cityLabel = label || DEFAULT_PRAYER_LOCATION.label;
-  $('prayerCaption').textContent = `Waktu Shalat ${cityLabel} dan Sekitarnya`;
+  $('prayerCaption').textContent = 'Jadwal Shalat Hari Ini — Kab. Bekasi';
 }
 
 function setPrayerHelperText(message) {
@@ -1607,7 +1606,7 @@ async function fetchPrayerTimesForLocation(locationInfo = DEFAULT_PRAYER_LOCATIO
   const cache = getPrayerScheduleCache();
   if (cache[cacheKey]?.times) {
     renderPrayerTimes(cache[cacheKey].times, `Cache jadwal shalat ${location.label}`);
-    setPrayerHelperText(`Jadwal shalat menyesuaikan lokasi ${location.label}.`);
+    setPrayerHelperText('Semoga keluarga kita dimudahkan menjaga shalat tepat waktu.');
     return cache[cacheKey].times;
   }
 
@@ -1622,7 +1621,7 @@ async function fetchPrayerTimesForLocation(locationInfo = DEFAULT_PRAYER_LOCATIO
     cache[cacheKey] = { times, cachedAt: new Date().toISOString(), label: location.label };
     setPrayerScheduleCache(cache);
     renderPrayerTimes(times, `API jadwal shalat ${location.label}`);
-    setPrayerHelperText(`Jadwal shalat menyesuaikan lokasi ${location.label}.`);
+    setPrayerHelperText('Semoga keluarga kita dimudahkan menjaga shalat tepat waktu.');
     return times;
   } catch (error) {
     console.warn('Gagal mengambil jadwal shalat; menggunakan fallback lokal.', error);
