@@ -583,17 +583,17 @@ function renderFamilyScoreboard() {
     .sort((a, b) => (b.points || 0) - (a.points || 0));
   box.hidden = rows.length <= 1;
   box.innerHTML = rows.length > 1
-    ? `<h2>Papan Semangat Keluarga</h2><p>Ringkasan poin saudara hanya untuk motivasi. Detail tugas tetap pribadi.</p>
-       <div class="scoreboard-list">${rows.map((row, index) => {
-         const pct = row.total ? Math.round((row.done || 0) / row.total * 100) : 0;
-         const self = row.name === session.user.childName;
-         return `<article class="score-card ${self ? 'self' : ''}">
-           <span class="rank">#${index + 1}</span>
-           <strong>${escapeHtml(row.name)}${self ? ' · Kamu' : ''}</strong>
-           <small>${row.points || 0} poin tersedia · ${row.done || 0}/${row.total || 0} tugas</small>
-           <div class="progress"><span style="width:${pct}%"></span></div>
-         </article>`;
-       }).join('')}</div>`
+    ? `<h2>Papan Semangat Keluarga</h2><p>Yuk semangat, jangan tertinggal poin kamu dengan saudara-saudaramu ya.</p>
+       <div class="scoreboard-list compact-scoreboard-list">
+         ${rows.map((row, index) => {
+           const self = row.name === session.user.childName;
+           return `<article class="score-card compact-score-card ${self ? 'self' : ''}">
+             <span class="rank">#${index + 1}</span>
+             <strong>${escapeHtml(row.name)}${self ? ' (Kamu)' : ''}</strong>
+             <div class="score-points">${row.points || 0} poin</div>
+           </article>`;
+         }).join('')}
+       </div>`
     : '';
 }
 
