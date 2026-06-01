@@ -42,9 +42,28 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET') return;
 
+  const requestUrl = new URL(event.request.url);
+  const isSameOrigin = requestUrl.origin === self.location.origin;
+  const isNavigation = event.request.mode === 'navigate';
+  const isRuntimeConfig = isSameOrigin && requestUrl.pathname.endsWith('/config.js');
+
   event.respondWith(
-    caches.match(event.request).then(function (cachedResponse) {
-      return cachedResponse || fetch(event.request);
-    })
+    (async function () {
+      if (isNavigation || isRuntimeConfig) {
+        try {
+          const freshResponse = await fetch(event.request);
+          return freshResponse;
+        } catch (error) {
+          const fallbackResponse = await caches.match(event.request);
+          if (fallbackResponse) return fallbackResponse;
+          if (isNavigation) return caches.match('./index.html');
+          throw error;
+        }
+      }
+
+      const cachedResponse = await caches.match(event.request);
+      if (cachedResponse) return cachedResponse;
+      return fetch(event.request);
+    })()
   );
 });
