@@ -98,6 +98,10 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .prayer-time-item.next { border-color: rgba(255, 202, 26, .75); background: linear-gradient(160deg, rgba(255, 202, 26, .96), rgba(255, 231, 138, .92)); box-shadow: 0 10px 28px rgba(255, 202, 26, .24); }
 .prayer-time-item.next span, .prayer-time-item.next strong { color: var(--blue); }
 .prayer-time-item.is-loading { grid-column: 1 / -1; }
+.quick-guide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.guide-card { padding: 9px 11px; border: 1px solid rgba(255, 202, 26, .26); border-radius: 12px; background: rgba(8, 25, 50, .22); }
+.guide-card h3 { margin: 0 0 4px; color: rgba(255,255,255,.95); font-size: 12px; font-weight: 800; }
+.guide-card p { margin: 0; color: rgba(255,255,255,.74); font-size: 11px; line-height: 1.45; }
 
 .app { width: min(100%, 1120px); margin: 0 auto; padding: clamp(14px, 3vw, 32px); }
 .hero { display: flex; justify-content: space-between; gap: 18px; align-items: center; padding: clamp(18px, 4vw, 28px); margin-bottom: 14px; background: rgba(255,255,255,.95); }
@@ -147,6 +151,8 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .alert-box { margin: 0 0 20px; padding: 16px; border: 1px solid rgba(255, 202, 26, .38); border-radius: 18px; background: #fff8df; color: var(--blue-3); }
 .alert-box h3 { margin: 0 0 8px; }
 .alert-box p { margin: 6px 0; color: #40516b; }
+#taskProposalAlertBox { cursor: pointer; }
+#taskProposalAlertBox:hover { box-shadow: 0 10px 24px rgba(20, 39, 84, .12); }
 .scoreboard { margin-top: 18px; padding: 16px; border: 1px solid var(--line-soft); border-radius: 18px; background: rgba(255,255,255,.64); }
 .scoreboard h2 { margin-bottom: 6px; }
 .scoreboard > p { margin: 0 0 12px; color: var(--muted); }
@@ -257,6 +263,7 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
   .auth-tabs { grid-template-columns: 1fr; border-radius: 20px; }
   .captcha-row { grid-template-columns: 1fr; }
   .prayer-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .quick-guide { grid-template-columns: 1fr; }
   .hero { align-items: flex-start; }
   .tabs { top: 0; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding: 8px; border-radius: 18px; scroll-snap-type: x mandatory; }
   .tabs button { min-width: max-content; padding-inline: 14px; font-size: 12px; scroll-snap-align: start; }

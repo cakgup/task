@@ -15,6 +15,7 @@ let taskSummary = { stats: { total: 0, done: 0, pending: 0 }, children: {} };
 let taskTemplates = [];
 let billTemplates = [];
 let redemptions = [];
+let taskProposals = [];
 let account = null;
 let captchas = {};
 let dailyRefreshTimer = null;
@@ -152,15 +153,14 @@ function bindEvents() {
     button.addEventListener('click', () => openTab(button.dataset.tab));
   });
 
-  $('refreshBtn').addEventListener('click', loadTasks);
   $('filterChild').addEventListener('change', renderTasks);
   $('filterTaskDate').addEventListener('change', loadTasks);
   $('filterStatus').addEventListener('change', renderTasks);
+  $('requestTaskProposalBtn')?.addEventListener('click', openTaskProposalDialog);
 
   $('taskForm').addEventListener('submit', saveTask);
   $('resetForm').addEventListener('click', resetTaskForm);
 
-  $('refreshBillsBtn').addEventListener('click', loadBills);
   $('filterBillMonth').addEventListener('change', loadBills);
   $('filterBillStatus').addEventListener('change', renderBills);
   document.querySelectorAll('[data-bill-filter]').forEach((button) => {
@@ -178,12 +178,13 @@ function bindEvents() {
   $('billTemplateForm').addEventListener('submit', saveBillTemplate);
   $('resetBillTemplateForm').addEventListener('click', resetBillTemplateForm);
 
-  $('refreshRedemptionsBtn').addEventListener('click', loadRedemptions);
   $('requestRedeemBtn').addEventListener('click', openRedeemDialog);
   $('redeemForm').addEventListener('submit', submitRedeem);
   $('cancelRedeemBtn').addEventListener('click', closeRedeemDialog);
+  $('taskProposalForm').addEventListener('submit', submitTaskProposal);
+  $('cancelTaskProposalBtn').addEventListener('click', closeTaskProposalDialog);
+  $('taskProposalAlertBox')?.addEventListener('click', () => openTaskProposalsForParent());
 
-  $('refreshAccountBtn').addEventListener('click', loadAccount);
   $('prayerLocationBtn')?.addEventListener('click', detectPrayerLocation);
   $('installAppBtn')?.addEventListener('click', handleInstallClick);
   $('closeInstallHelpBtn')?.addEventListener('click', closeInstallGuide);
@@ -379,6 +380,8 @@ function applyRoleUi() {
   if (filterChildWrap) filterChildWrap.hidden = isChild();
 
   $('childRedeemAction').hidden = !isChild();
+  $('childTaskProposalAction').hidden = !isChild();
+  $('taskProposalSection').hidden = !isParent() && !isChild();
   if (isChild() && ['bills', 'add', 'manage', 'account'].includes(activeTab)) openTab('dashboard');
 }
 
@@ -390,6 +393,7 @@ async function loadBootstrap() {
     loadTasks(),
     loadTaskSummary(),
     loadRedemptions(),
+    loadTaskProposals(),
     isParent() ? loadBills() : Promise.resolve(),
     isParent() ? loadTemplates() : Promise.resolve(),
     isParent() ? loadAccount() : Promise.resolve()
@@ -475,6 +479,37 @@ async function loadRedemptions() {
   renderRedemptions();
 }
 
+function taskProposalStorageKey() {
+  const familyKey = session?.user?.familyId || session?.user?.email || 'default';
+  return `cakgupTaskProposals_${familyKey}`;
+}
+
+function readTaskProposalsLocal() {
+  try {
+    const raw = localStorage.getItem(taskProposalStorageKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveTaskProposalsLocal(list) {
+  localStorage.setItem(taskProposalStorageKey(), JSON.stringify(list));
+}
+
+async function loadTaskProposals() {
+  try {
+    const data = await apiGet('getTaskProposals');
+    taskProposals = data.data || [];
+  } catch (error) {
+    taskProposals = readTaskProposalsLocal();
+  }
+  taskProposals.sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')));
+  renderTaskProposalAlert();
+  renderTaskProposals();
+}
+
 async function loadAccount() {
   if (!isParent()) return;
   const data = await apiGet('getAccount');
@@ -520,6 +555,7 @@ function renderDashboard() {
   $('statPending').textContent = stats.pending || 0;
 
   renderBillAlerts();
+  renderTaskProposalAlert();
 
   const visibleChildren = isChild()
     ? children.filter((child) => child.name === session.user.childName)
@@ -568,6 +604,27 @@ function renderBillAlerts() {
   box.innerHTML = alertBills.length
     ? `<h3>Alarm Tagihan</h3>${alertBills.slice(0, 5).map((bill) => `<p><strong>${escapeHtml(bill.nama)}</strong> · ${escapeHtml(bill.dueMessage)} · ${escapeHtml(bill.jatuhTempo || '-')}</p>`).join('')}`
     : '';
+}
+
+function renderTaskProposalAlert() {
+  const box = $('taskProposalAlertBox');
+  if (!box) return;
+  if (!isParent()) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  const pending = taskProposals.filter((item) => item.status === 'PENDING');
+  box.hidden = pending.length === 0;
+  box.innerHTML = pending.length
+    ? `<h3>Pengajuan Tugas Anak</h3><p>Ada ${pending.length} usulan tugas baru dari anak. Klik kotak ini untuk review.</p>`
+    : '';
+}
+
+function openTaskProposalsForParent() {
+  if (!isParent()) return;
+  openTab('redemptions');
+  $('taskProposalSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderFamilyScoreboard() {
@@ -1000,6 +1057,56 @@ function closeRedeemDialog() {
   else $('redeemDialog').removeAttribute('open');
 }
 
+function openTaskProposalDialog() {
+  if (!isChild()) return;
+  $('proposalTitleInput').value = '';
+  $('proposalCategoryInput').value = 'Pekerjaan Rumah';
+  $('proposalLoadInput').value = '1';
+  $('proposalDateInput').value = today();
+  $('proposalDescriptionInput').value = '';
+  if ($('taskProposalDialog').showModal) $('taskProposalDialog').showModal();
+  else $('taskProposalDialog').setAttribute('open', 'open');
+}
+
+function closeTaskProposalDialog() {
+  if ($('taskProposalDialog').close) $('taskProposalDialog').close();
+  else $('taskProposalDialog').removeAttribute('open');
+}
+
+async function submitTaskProposal(event) {
+  event.preventDefault();
+  if (!isChild()) return;
+  const proposal = {
+    id: uid('proposal'),
+    childName: session.user.childName,
+    title: $('proposalTitleInput').value.trim(),
+    category: $('proposalCategoryInput').value.trim(),
+    load: Number($('proposalLoadInput').value || 1),
+    date: $('proposalDateInput').value || today(),
+    description: $('proposalDescriptionInput').value.trim(),
+    status: 'PENDING',
+    requestedAt: new Date().toISOString(),
+    decidedAt: ''
+  };
+  if (!proposal.title) {
+    setStatus('Judul usulan tugas wajib diisi.');
+    return;
+  }
+
+  try {
+    await apiPost('requestTaskProposal', { proposal });
+  } catch (error) {
+    const current = readTaskProposalsLocal();
+    current.unshift(proposal);
+    saveTaskProposalsLocal(current);
+  }
+
+  closeTaskProposalDialog();
+  await loadTaskProposals();
+  setStatus('Usulan tugas dikirim. Menunggu persetujuan orang tua.');
+  openTab('redemptions');
+}
+
 async function submitRedeem(event) {
   event.preventDefault();
   if (!isChild()) return;
@@ -1020,6 +1127,39 @@ async function submitRedeem(event) {
   openTab('redemptions');
 }
 
+async function decideTaskProposal(id, status) {
+  if (!isParent()) return;
+  const proposal = taskProposals.find((item) => item.id === id);
+  if (!proposal || proposal.status !== 'PENDING') return;
+
+  try {
+    await apiPost('decideTaskProposal', { id, status });
+  } catch (error) {
+    const local = readTaskProposalsLocal().map((item) => {
+      if (item.id !== id) return item;
+      return { ...item, status, decidedAt: new Date().toISOString() };
+    });
+    saveTaskProposalsLocal(local);
+    if (status === 'APPROVED') {
+      await apiPost('addTask', {
+        task: {
+          id: uid('tsk'),
+          tanggalTugas: proposal.date || today(),
+          namaAnak: proposal.childName,
+          judul: proposal.title,
+          deskripsi: proposal.description || '',
+          kategori: proposal.category || 'Lainnya',
+          beban: Number(proposal.load || 1),
+          status: 'Belum'
+        }
+      }).catch(() => {});
+    }
+  }
+
+  await Promise.all([loadTaskProposals(), loadTasks()]);
+  setStatus(status === 'APPROVED' ? 'Usulan tugas disetujui.' : 'Usulan tugas ditolak.');
+}
+
 async function decideRedeem(id, status) {
   if (!isParent()) return;
   await apiPost('decideRedeem', { id, status });
@@ -1029,6 +1169,7 @@ async function decideRedeem(id, status) {
 
 function renderRedemptions() {
   $('childRedeemAction').hidden = !isChild();
+  renderTaskProposals();
   $('redemptionList').innerHTML = redemptions.length
     ? redemptions.map((item) => {
       const actions = isParent() && item.status === 'PENDING'
@@ -1042,6 +1183,29 @@ function renderRedemptions() {
       </article>`;
     }).join('')
     : '<article class="task-card">Belum ada pengajuan pencairan.</article>';
+}
+
+function renderTaskProposals() {
+  const list = $('taskProposalList');
+  if (!list) return;
+  const visible = isChild()
+    ? taskProposals.filter((item) => item.childName === session.user.childName)
+    : taskProposals;
+  list.innerHTML = visible.length
+    ? visible.map((item) => {
+      const actions = isParent() && item.status === 'PENDING'
+        ? `<div class="actions"><button onclick="decideTaskProposal('${escapeJs(item.id)}','APPROVED')">Setujui</button><button class="danger" onclick="decideTaskProposal('${escapeJs(item.id)}','REJECTED')">Tolak</button></div>`
+        : '';
+      return `<article class="task-card">
+        <h3>${escapeHtml(item.childName)} · ${escapeHtml(item.title)}</h3>
+        <p class="task-description"><span>Status: ${escapeHtml(labelTaskProposal(item.status))}</span><span>Diajukan: ${formatDateTime(item.requestedAt)}</span></p>
+        <p class="task-description"><span>Kategori: ${escapeHtml(item.category || 'Lainnya')}</span><span>Beban: ${Number(item.load || 1)}</span><span>Tanggal: ${escapeHtml(item.date || '-')}</span></p>
+        ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
+        ${item.decidedAt ? `<p class="task-description"><span>Diputuskan: ${formatDateTime(item.decidedAt)}</span></p>` : ''}
+        ${actions}
+      </article>`;
+    }).join('')
+    : '<article class="task-card">Belum ada usulan tugas.</article>';
 }
 
 function renderAccount() {
@@ -1098,6 +1262,10 @@ async function logoutAllSessions() {
 }
 
 function labelRedemption(status) {
+  return ({ PENDING: 'Menunggu Persetujuan', APPROVED: 'Disetujui', REJECTED: 'Ditolak' })[status] || status;
+}
+
+function labelTaskProposal(status) {
   return ({ PENDING: 'Menunggu Persetujuan', APPROVED: 'Disetujui', REJECTED: 'Ditolak' })[status] || status;
 }
 
@@ -1454,6 +1622,7 @@ function startDailyRefresh() {
     if (isParent() && ($('filterBillMonth').value || currentMonth()) === currentMonth()) {
       await loadBills();
     }
+    await loadTaskProposals();
   }, 60000);
 }
 
@@ -1470,5 +1639,6 @@ window.editBillTemplate = editBillTemplate;
 window.deleteBillTemplate = deleteBillTemplate;
 window.openRedeemDialog = openRedeemDialog;
 window.decideRedeem = decideRedeem;
+window.decideTaskProposal = decideTaskProposal;
 
 init();

@@ -50,6 +50,17 @@
             <div class="prayer-time-item is-loading"><span>Memuat</span><strong>--:--</strong></div>
           </div>
         </section>
+
+        <section class="quick-guide" aria-label="Petunjuk singkat penggunaan aplikasi">
+          <article class="guide-card">
+            <h3>Orang Tua</h3>
+            <p>Masuk untuk buat tugas, cek tagihan, dan setujui pencairan poin anak.</p>
+          </article>
+          <article class="guide-card">
+            <h3>Anak</h3>
+            <p>Masuk pakai nama + PIN, selesaikan tugas harian, lalu ajukan pencairan poin.</p>
+          </article>
+        </section>
       </div>
 
       <section id="authCard" class="login-card auth-card compact-auth">
@@ -134,6 +145,7 @@
         <article class="stat-card"><span id="statPending">0</span><small>Belum</small></article>
       </div>
       <div id="billAlertBox" class="alert-box" hidden></div>
+      <div id="taskProposalAlertBox" class="alert-box" hidden></div>
       <div class="children-heading">
         <h2 id="dashboardHeading">Yuk kumpulkan poin!</h2>
         <p id="dashboardSubheading">Klik nama anak untuk melihat penugasan harian.</p>
@@ -146,7 +158,10 @@
     <section id="tasks" class="panel">
       <div class="section-head">
         <h2>Daftar Tugas</h2>
-        <button id="refreshBtn" class="small-btn">Muat ulang</button>
+      </div>
+      <div id="childTaskProposalAction" class="redeem-action" hidden>
+        <p>Belum ada tugas yang cocok? Ajukan usulan tugas baru ke orang tua.</p>
+        <button id="requestTaskProposalBtn" class="secondary">Ajukan Tugas Baru</button>
       </div>
       <div class="filters">
         <div id="filterChildWrap" class="filter-item">
@@ -169,7 +184,6 @@
     <section id="bills" class="panel">
       <div class="section-head">
         <h2>Tagihan Bulanan</h2>
-        <button id="refreshBillsBtn" class="small-btn">Muat ulang</button>
       </div>
       <div class="stats-grid bill-stats">
         <button type="button" class="stat-card stat-filter" data-bill-filter="all"><span id="billTotal">0</span><small>Total Bulan Ini</small></button>
@@ -303,7 +317,6 @@
     <section id="account" class="panel">
       <div class="section-head">
         <h2>Pengaturan Akun</h2>
-        <button id="refreshAccountBtn" class="small-btn">Muat ulang</button>
       </div>
       <div class="form-stack account-grid">
         <section class="form-section">
@@ -343,8 +356,12 @@
     <section id="redemptions" class="panel">
       <div class="section-head">
         <h2>Pencairan Poin</h2>
-        <button id="refreshRedemptionsBtn" class="small-btn">Muat ulang</button>
       </div>
+      <section id="taskProposalSection" class="form-section">
+        <h2>Usulan Tugas Anak</h2>
+        <p class="form-hint">Orang tua dapat menyetujui agar usulan otomatis masuk ke daftar tugas.</p>
+        <div id="taskProposalList" class="task-list"></div>
+      </section>
       <div id="childRedeemAction" class="redeem-action" hidden>
         <p>Ajukan pencairan poin kepada orang tua. Poin tidak dikurangi sebelum disetujui.</p>
         <button id="requestRedeemBtn" class="primary">Ajukan Cairkan Poin</button>
@@ -362,6 +379,33 @@
       <div class="dialog-actions">
         <button id="cancelRedeemBtn" type="button" class="secondary">Batal</button>
         <button type="submit" class="primary">Kirim Pengajuan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="taskProposalDialog" class="app-dialog">
+    <form id="taskProposalForm" method="dialog" class="dialog-card">
+      <h2>Ajukan Tugas Baru</h2>
+      <label>Judul tugas<input id="proposalTitleInput" required placeholder="Contoh: Rapikan meja belajar" /></label>
+      <div class="form-row">
+        <label>Kategori
+          <select id="proposalCategoryInput">
+            <option>Pekerjaan Rumah</option>
+            <option>Belajar</option>
+            <option>Ibadah/Kedisiplinan</option>
+            <option>Pribadi</option>
+            <option>Lainnya</option>
+          </select>
+        </label>
+        <label>Beban
+          <input id="proposalLoadInput" type="number" min="1" step="1" value="1" required />
+        </label>
+      </div>
+      <label>Tanggal usulan<input id="proposalDateInput" type="date" required /></label>
+      <label>Catatan untuk orang tua<textarea id="proposalDescriptionInput" rows="3" placeholder="Opsional"></textarea></label>
+      <div class="dialog-actions">
+        <button id="cancelTaskProposalBtn" type="button" class="secondary">Batal</button>
+        <button type="submit" class="primary">Kirim Usulan</button>
       </div>
     </form>
   </dialog>
