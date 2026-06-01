@@ -17,6 +17,7 @@ let billTemplates = [];
 let redemptions = [];
 let taskProposals = [];
 let account = null;
+let adminFamilies = [];
 let captchas = {};
 let dailyRefreshTimer = null;
 let prayerRefreshTimer = null;
@@ -194,6 +195,7 @@ function bindEvents() {
   $('accountEmailForm').addEventListener('submit', saveAccountEmail);
   $('accountPasswordForm').addEventListener('submit', saveAccountPassword);
   $('logoutAllBtn').addEventListener('click', logoutAllSessions);
+  $('adminResetForm')?.addEventListener('submit', submitAdminResetPassword);
   $('chatToggleBtn')?.addEventListener('click', toggleChatPanel);
   $('chatCloseBtn')?.addEventListener('click', closeChatPanel);
   $('chatForm')?.addEventListener('submit', sendChatMessage);
@@ -369,6 +371,10 @@ async function showApp() {
   applyRoleUi();
   initFloatingChat();
   await loadBootstrap();
+  if (isParent() && session.user.mustChangePassword) {
+    setStatus('Password Anda baru saja direset admin. Segera ubah password di menu Akun.');
+    openTab('account');
+  }
   startDailyRefresh();
 }
 
@@ -392,6 +398,7 @@ function applyRoleUi() {
   $('childRedeemAction').hidden = !isChild();
   $('childTaskProposalAction').hidden = !isChild();
   $('taskProposalSection').hidden = !isParent() && !isChild();
+  $('superAdminSection').hidden = !session.user.isSuperAdmin;
   if (isChild() && ['bills', 'add', 'manage', 'account'].includes(activeTab)) openTab('dashboard');
 }
 
@@ -406,7 +413,8 @@ async function loadBootstrap() {
     loadTaskProposals(),
     isParent() ? loadBills() : Promise.resolve(),
     isParent() ? loadTemplates() : Promise.resolve(),
-    isParent() ? loadAccount() : Promise.resolve()
+    isParent() ? loadAccount() : Promise.resolve(),
+    session.user.isSuperAdmin ? loadFamiliesAdmin() : Promise.resolve()
   ]);
   render();
   setStatus('Data tersinkron dari server');
@@ -525,6 +533,17 @@ async function loadAccount() {
   const data = await apiGet('getAccount');
   account = data.data || null;
   renderAccount();
+}
+
+async function loadFamiliesAdmin() {
+  if (!session.user.isSuperAdmin) return;
+  const data = await apiGet('getFamiliesAdmin');
+  adminFamilies = (data.data || []).filter((item) => item.familyId !== session.user.familyId);
+  const select = $('adminTargetFamily');
+  if (!select) return;
+  select.innerHTML = adminFamilies.length
+    ? adminFamilies.map((family) => `<option value="${escapeHtml(family.familyId)}">${escapeHtml(family.email)} · ${escapeHtml(family.headOfFamily || '-')}</option>`).join('')
+    : '<option value="">Tidak ada keluarga lain</option>';
 }
 
 function openTab(id) {
@@ -1264,6 +1283,26 @@ async function logoutAllSessions() {
   await apiPost('logoutAll');
   clearSession();
   showLogin();
+}
+
+async function submitAdminResetPassword(event) {
+  event.preventDefault();
+  if (!session.user.isSuperAdmin) return;
+  const targetFamilyId = $('adminTargetFamily').value;
+  if (!targetFamilyId) {
+    setStatus('Pilih keluarga target dulu.');
+    return;
+  }
+  if (!confirm('Reset password keluarga target sekarang?')) return;
+  const data = await apiPost('adminResetFamilyPassword', {
+    targetFamilyId,
+    newPassword: $('adminNewPassword').value.trim()
+  });
+  $('adminNewPassword').value = '';
+  $('adminResetResult').hidden = false;
+  $('adminResetResult').textContent = `Reset berhasil untuk ${data.targetEmail || 'target'}. Password sementara: ${data.temporaryPassword}`;
+  setStatus('Reset password keluarga berhasil.');
+  await loadFamiliesAdmin();
 }
 
 function labelRedemption(status) {

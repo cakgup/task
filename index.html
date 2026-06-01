@@ -350,6 +350,20 @@
           <p class="form-hint">Gunakan fitur ini apabila akun pernah digunakan di perangkat lain.</p>
           <button id="logoutAllBtn" type="button" class="secondary danger">Logout dari Semua Perangkat</button>
         </section>
+        <section id="superAdminSection" class="form-section" hidden>
+          <h2>Super Admin: Reset Password Keluarga</h2>
+          <p class="form-hint">Gunakan dengan hati-hati. User target akan logout dari semua perangkat dan diminta ganti password.</p>
+          <form id="adminResetForm" class="task-form">
+            <label>Keluarga target
+              <select id="adminTargetFamily" required></select>
+            </label>
+            <label>Password sementara baru (opsional)
+              <input id="adminNewPassword" type="text" placeholder="Kosongkan untuk auto-generate" />
+            </label>
+            <button type="submit" class="primary">Reset Password Keluarga</button>
+          </form>
+          <p id="adminResetResult" class="form-hint" hidden></p>
+        </section>
       </div>
     </section>
 
