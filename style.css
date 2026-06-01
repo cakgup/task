@@ -242,7 +242,7 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .install-guide-list li + li { margin-top: 8px; }
 
 .floating-chat { position: fixed; left: 14px; bottom: 14px; z-index: 50; display: grid; gap: 8px; }
-.floating-chat-toggle { min-height: 40px; padding: 10px 14px; border-radius: 14px; background: rgba(255, 202, 26, .95); color: var(--blue-3); box-shadow: 0 10px 28px rgba(6, 18, 38, .26); }
+.floating-chat-toggle { width: 46px; min-height: 46px; height: 46px; padding: 0; border-radius: 999px; display: inline-grid; place-items: center; background: rgba(255, 202, 26, .95); color: var(--blue-3); font-size: 20px; line-height: 1; box-shadow: 0 10px 28px rgba(6, 18, 38, .26); }
 .floating-chat-panel { width: min(92vw, 320px); display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(255, 202, 26, .26); border-radius: 16px; background: rgba(255,255,255,.96); box-shadow: var(--shadow); }
 .floating-chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .floating-chat-head button { min-height: 30px; padding: 6px 10px; border-radius: 10px; font-size: 12px; }
