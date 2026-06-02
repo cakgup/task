@@ -1,32 +1,104 @@
-# Tugas Keluarga - Multi-Tenant SaaS Family Management Platform
+﻿# 🌙 Tugas Keluarga — Pengingat Kebaikan Harian
 
-Versi ini sudah disesuaikan dengan UR terbaru: aplikasi tidak lagi hanya single-tenant berbasis file statis, tetapi memakai frontend statis + Cloudflare Workers + Cloudflare D1 sebagai backend multi-tenant.
+<p align="center">
+  <strong>Aplikasi keluarga untuk membangun amanah harian, ibadah, dan kebiasaan baik di rumah</strong><br>
+  Multi-tenant, mobile-friendly, dan siap dipasang sebagai PWA.
+</p>
 
-## Fitur Utama
+<p align="center">
+  <a href="https://cakgup.github.io/task/">
+    <img src="https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen?logo=github" alt="GitHub Pages">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License GPL-3.0">
+  </a>
+  <img src="https://img.shields.io/badge/PWA-Installable-1E88E5" alt="PWA Installable">
+  <img src="https://img.shields.io/badge/Cloudflare-D1%20%2B%20Workers-F38020" alt="Cloudflare Stack">
+</p>
 
-- Registrasi keluarga baru dengan `family_id` otomatis.
-- Login Orang Tua menggunakan email keluarga dan kata sandi utama.
-- Login Anak menggunakan email keluarga, nama anak, dan PIN 4–6 digit.
-- Math captcha untuk login dan registrasi, divalidasi di sisi server.
-- Isolasi data seluruh modul berdasarkan `family_id`.
-- Role-Based Access Control:
-  - Orang tua dapat mengelola tugas, tagihan, anak, template, dan persetujuan pencairan poin.
-  - Anak hanya melihat tugas miliknya sendiri dan tidak dapat membuka modul tagihan bulanan.
-- Daily seeding tugas harian dan monthly seeding tagihan bulanan.
-- Perlakuan hibrida:
-  - Akun default `cakgup` memakai template lama Fatiyyah, Alifah, Fatih dan 15 tagihan default.
-  - Keluarga baru memakai template yang dibuat sendiri melalui menu Master.
+---
 
-## Struktur Folder
+## ✦ Bismillahirrahmanirrahim
+
+Aplikasi ini dibuat sebagai ikhtiar agar rumah menjadi ruang tumbuh yang saling mengingatkan dalam kebaikan.  
+Orang tua lebih mudah mengelola amanah harian, anak lebih semangat menunaikan tugas, dan seluruh keluarga punya ritme ibadah yang lebih terjaga.
+
+> _“Wata'awanu 'alal birri wat taqwa.”_  
+> Saling tolong-menolonglah dalam kebaikan dan ketakwaan.
+
+---
+
+## 📌 Tentang Aplikasi
+
+**Tugas Keluarga** adalah aplikasi web keluarga berbasis **frontend statis + API backend** untuk manajemen tugas anak, tagihan bulanan, dan pencairan poin secara terstruktur.
+
+Cocok digunakan untuk:
+
+- pengelolaan amanah harian anak di rumah;
+- pembiasaan disiplin dengan sistem poin;
+- pemantauan tagihan keluarga bulanan;
+- komunikasi orang tua-anak lewat alur usulan dan persetujuan.
+
+---
+
+## ✨ Fitur Utama
+
+| Fitur | Keterangan |
+|---|---|
+| 👨‍👩‍👧‍👦 Multi-Tenant Family | Tiap keluarga punya data terisolasi berdasarkan `family_id` |
+| 🔐 Login Orang Tua & Anak | Role terpisah: orang tua (manajemen), anak (eksekusi tugas) |
+| ➕ Registrasi Keluarga Baru | Pendaftaran akun keluarga langsung dari aplikasi |
+| 🧠 Captcha Aritmatika | Validasi login/registrasi dengan soal hitung sederhana |
+| ✅ Tugas Harian | Buat, pantau, dan selesaikan tugas dengan status progres |
+| 💰 Tagihan Bulanan | Kelola tagihan rutin/non-rutin + pengingat jatuh tempo |
+| 🎯 Pencairan Poin | Anak ajukan, orang tua review dan setujui |
+| 🙋 Usulan Tugas Anak | Anak bisa mengajukan ide tugas baru ke orang tua |
+| 🕌 Widget Jadwal Shalat | Menampilkan jadwal shalat dengan dukungan deteksi lokasi |
+| 📱 PWA Installable | Bisa dipasang ke homescreen Android/iOS/Desktop |
+
+---
+
+## 🧭 Alur Peran
+
+| Peran | Akses Utama |
+|---|---|
+| Orang Tua | Kelola tugas, tagihan, anak, template, persetujuan pencairan, pengaturan akun |
+| Anak | Lihat & kerjakan tugas sendiri, ajukan tugas baru, ajukan pencairan poin |
+
+---
+
+## 🗂️ Struktur Repository
 
 ```text
-task/        Frontend statis untuk GitHub Pages/hosting statis
-task-api/    Cloudflare Worker API + schema D1
+task/
+├── index.html
+├── style.css
+├── app.js
+├── config.js
+├── sw.js
+├── manifest.webmanifest
+├── assets/
+├── gas/
+└── README.md
 ```
 
-## Konfigurasi Frontend
+Keterangan singkat:
 
-Edit `task/config.js`:
+| File/Folder | Fungsi |
+|---|---|
+| `index.html` | Struktur halaman login, panel aplikasi, dan dialog interaksi |
+| `style.css` | Tema visual dan layout responsif |
+| `app.js` | Seluruh logika aplikasi frontend |
+| `config.js` | Konfigurasi endpoint API |
+| `sw.js` | Service worker untuk dukungan PWA/offline dasar |
+| `assets/` | Ikon dan aset visual |
+| `gas/` | Utilitas/arsip terkait integrasi tambahan |
+
+---
+
+## ⚙️ Konfigurasi API
+
+Atur endpoint API di file `config.js`:
 
 ```js
 window.CAKGUP_CONFIG = {
@@ -35,52 +107,120 @@ window.CAKGUP_CONFIG = {
 };
 ```
 
-## Setup Backend Cloudflare D1
+Jika memakai API sendiri, ganti `API_URL` sesuai domain backend Anda.
+
+---
+
+## 🚀 Menjalankan Secara Lokal
+
+Jangan buka file langsung via `file://`. Gunakan local server.
+
+### Opsi 1 — Python
 
 ```bash
-cd task-api
-npx wrangler d1 execute task-db --file=./schema.sql --remote
-npx wrangler d1 execute task-db --file=./migrasi_data_lama.sql --remote   # opsional
-npx wrangler deploy
+python -m http.server 5500 --directory .
 ```
 
-## Akun Default Cakgup
-
-Orang tua:
+Lalu buka:
 
 ```text
-Email keluarga: cakgup
-Password: cakgup
+http://localhost:5500
 ```
 
-Anak:
-
-```text
-Email keluarga: cakgup
-Nama anak: Fatiyyah / Alifah / Fatih
-PIN awal: 1234
-```
-
-## Catatan Keamanan
-
-Password, PIN, token sesi, dan captcha tidak disimpan dalam bentuk polos. Backend menyimpan hash SHA-256 bersalt untuk password/PIN dan hash token untuk sesi. Untuk produksi besar, disarankan menambahkan rate limiting berbasis IP/user-agent di Cloudflare WAF atau Durable Object.
-
-## Update 31 Mei 2026
-
-Versi ini menambahkan UI mobile login ringkas, menu Akun, tagihan rutin/non-rutin, alarm jatuh tempo, pencairan poin sebagian, papan semangat keluarga untuk akun anak, dan navigasi yang lebih rapi. Untuk database existing, jalankan migration tambahan di `task-api/migration_update_2026_05_31.sql` sebelum deploy Worker terbaru.
-
-## Hotfix Foreign Key 31 Mei 2026
-
-Paket ini memperbaiki error saat login:
-
-```text
-D1_ERROR: FOREIGN KEY constraint failed
-```
-
-Penyebabnya adalah seeding tagihan bulanan default `cakgup` mengisi `monthly_bills.created_from_template_id`, tetapi template default belum tersedia di `bill_templates`. Backend sekarang otomatis melakukan bootstrap 15 template tagihan default sebelum seeding bulanan. Jika database D1 sudah terlanjur dibuat dan masih error, jalankan:
+### Opsi 2 — Node.js
 
 ```bash
-cd task-api
-npx wrangler d1 execute task-db --file=./migration_hotfix_fk_2026_05_31.sql --remote
-npx wrangler deploy
+npx -y serve .
 ```
+
+Lalu buka:
+
+```text
+http://localhost:3000
+```
+
+---
+
+## 🌐 Deploy Frontend
+
+Frontend ini bisa dideploy ke:
+
+- GitHub Pages
+- Cloudflare Pages
+- Vercel
+- Netlify
+
+Untuk GitHub Pages:
+
+1. Push ke branch `main`.
+2. Buka `Settings` → `Pages`.
+3. Pilih source `Deploy from a branch`.
+4. Pilih branch `main`, folder `/root`.
+5. Simpan dan tunggu URL aktif.
+
+---
+
+## 🧪 Checklist Sebelum Publish
+
+- [ ] Login orang tua dan anak berjalan normal
+- [ ] Registrasi keluarga baru berhasil
+- [ ] CRUD tugas dan tagihan berfungsi
+- [ ] Alur usulan tugas dan pencairan poin berjalan
+- [ ] Widget jadwal shalat tampil normal
+- [ ] Tidak ada error penting di browser console
+- [ ] `config.js` mengarah ke API yang benar
+
+---
+
+## 🧩 Troubleshooting
+
+### Tidak bisa login / registrasi
+
+- pastikan `API_URL` di `config.js` benar;
+- cek backend aktif dan dapat diakses;
+- cek captcha terisi benar.
+
+### Data tidak muncul setelah login
+
+- periksa koneksi internet;
+- cek respons API di tab Network browser;
+- pastikan akun memiliki data pada `family_id` yang sesuai.
+
+### PWA tidak muncul tombol install
+
+- akses via `https://` atau `http://localhost`;
+- pastikan `manifest.webmanifest` dan `sw.js` termuat;
+- beberapa browser butuh interaksi dulu sebelum prompt install muncul.
+
+---
+
+## 🔐 Catatan Keamanan
+
+- Password/PIN/token sesi sebaiknya selalu di-hash di backend.
+- Aktifkan rate limiting di layer API/WAF untuk mencegah brute force.
+- Hindari menyimpan data sensitif keluarga di sisi frontend.
+
+---
+
+## 🛠️ Teknologi
+
+| Teknologi | Fungsi |
+|---|---|
+| HTML | Struktur antarmuka |
+| CSS | Tampilan visual |
+| JavaScript | Logika interaksi frontend |
+| PWA (Manifest + Service Worker) | Instalasi aplikasi dan dukungan offline |
+| Cloudflare Workers + D1 | API backend dan database multi-tenant |
+
+---
+
+## 📜 Lisensi
+
+Repository ini menggunakan lisensi **GNU General Public License v3.0 (GPL-3.0)**.  
+Lihat detail pada file [LICENSE](LICENSE).
+
+---
+
+<p align="center">
+  <strong>Dibangun dengan niat baik, dirawat dengan amanah, dan dipakai untuk menumbuhkan kebiasaan baik keluarga.</strong>
+</p>
