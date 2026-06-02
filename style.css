@@ -54,6 +54,7 @@ h2 { margin: 0 0 16px; color: var(--blue-3); font-size: 24px; }
 h3 { margin: 0; color: var(--blue-3); }
 .subtitle { max-width: 690px; margin: 18px 0 24px; color: rgba(255,255,255,.82); font-size: 1.04rem; line-height: 1.65; }
 .login-utility { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px; }
+.login-card-head h2 { font-size: 23px; }
 .utility-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 10px 14px; color: #fff; background: rgba(8, 25, 50, .34); border: 1px solid rgba(255, 202, 26, .28); border-radius: 16px; box-shadow: 0 14px 28px rgba(8, 25, 50, .18); font-weight: 500; }
 .utility-btn:hover, .utility-btn:focus-visible { background: rgba(8, 25, 50, .5); }
 .utility-btn[hidden] { display: none !important; }
