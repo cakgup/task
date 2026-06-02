@@ -350,7 +350,7 @@
           <p class="form-hint">Gunakan fitur ini apabila akun pernah digunakan di perangkat lain.</p>
           <button id="logoutAllBtn" type="button" class="secondary danger">Logout dari Semua Perangkat</button>
         </section>
-        <section id="superAdminSection" class="form-section" hidden>
+      <section id="superAdminSection" class="form-section" hidden>
           <h2>Super Admin: Reset Password Keluarga</h2>
           <p class="form-hint">Gunakan dengan hati-hati. User target akan logout dari semua perangkat dan diminta ganti password.</p>
           <form id="adminResetForm" class="task-form">
@@ -363,6 +363,12 @@
             <button type="submit" class="primary">Reset Password Keluarga</button>
           </form>
           <p id="adminResetResult" class="form-hint" hidden></p>
+        </section>
+        <section class="form-section">
+          <h2>Notifikasi HP</h2>
+          <p id="notificationSupportText" class="form-hint">Memeriksa dukungan notifikasi perangkat...</p>
+          <p id="notificationStatusText" class="form-hint">Notifikasi belum aktif.</p>
+          <button id="enableNotificationsBtn" type="button" class="primary">Aktifkan Notifikasi</button>
         </section>
       </div>
     </section>
@@ -444,6 +450,7 @@
         <strong>Chat Keluarga</strong>
         <button id="chatCloseBtn" type="button" class="icon-btn">Tutup</button>
       </div>
+      <div id="chatPresence" class="form-hint chat-presence">Online: memeriksa...</div>
       <div id="chatStatus" class="form-hint">Menyambungkan...</div>
       <div id="chatMessages" class="floating-chat-messages"></div>
       <form id="chatForm" class="floating-chat-form">

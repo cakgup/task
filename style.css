@@ -246,6 +246,7 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .floating-chat-panel { width: min(92vw, 320px); display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(255, 202, 26, .26); border-radius: 16px; background: rgba(255,255,255,.96); box-shadow: var(--shadow); }
 .floating-chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .floating-chat-head button { min-height: 30px; padding: 6px 10px; border-radius: 10px; font-size: 12px; }
+.chat-presence { color: #39506f; font-size: 11px; }
 .floating-chat-messages { max-height: 260px; overflow: auto; display: grid; gap: 6px; padding-right: 2px; }
 .chat-item { padding: 7px 9px; border-radius: 10px; background: #edf3fb; font-size: 12px; line-height: 1.4; }
 .chat-item.mine { background: rgba(255, 202, 26, .24); }

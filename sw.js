@@ -67,3 +67,45 @@ self.addEventListener('fetch', function (event) {
     })()
   );
 });
+
+self.addEventListener('push', function (event) {
+  var payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (error) {
+    payload = { title: 'Tugas Keluarga', body: event.data ? event.data.text() : 'Ada pembaruan baru.' };
+  }
+
+  var title = payload.title || 'Tugas Keluarga';
+  var options = {
+    body: payload.body || 'Ada pembaruan baru.',
+    icon: './assets/icons/icon-192.png',
+    badge: './assets/icons/icon-192.png',
+    data: {
+      url: payload.url || './',
+      type: payload.type || 'general'
+    }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  var targetUrl = (event.notification.data && event.notification.data.url) || './';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if ('focus' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

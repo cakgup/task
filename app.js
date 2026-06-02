@@ -5,6 +5,7 @@ const POINT_MULTIPLIER = 200;
 const DEFAULT_PRAYER_LOCATION = { cityId: '1301', label: 'DKI Jakarta' };
 const PRAYER_LOCATION_KEY = 'cakgupPrayerLocation';
 const PRAYER_SCHEDULE_CACHE_KEY = 'cakgupPrayerScheduleCache';
+const PRESENCE_HEARTBEAT_MS = 30000;
 
 let session = readSession();
 let activeTab = 'dashboard';
@@ -24,6 +25,11 @@ let prayerRefreshTimer = null;
 let deferredInstallPrompt = null;
 let chatSocket = null;
 let chatConnected = false;
+let chatReconnectTimer = null;
+let presenceHeartbeatTimer = null;
+let swRegistration = null;
+let latestPresence = { onlineCount: 0, members: [], updatedAt: '' };
+let pushPublicKey = cfg.PUSH_PUBLIC_KEY || '';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
@@ -195,10 +201,13 @@ function bindEvents() {
   $('accountEmailForm').addEventListener('submit', saveAccountEmail);
   $('accountPasswordForm').addEventListener('submit', saveAccountPassword);
   $('logoutAllBtn').addEventListener('click', logoutAllSessions);
+  $('enableNotificationsBtn')?.addEventListener('click', enablePushNotifications);
   $('adminResetForm')?.addEventListener('submit', submitAdminResetPassword);
   $('chatToggleBtn')?.addEventListener('click', toggleChatPanel);
   $('chatCloseBtn')?.addEventListener('click', closeChatPanel);
   $('chatForm')?.addEventListener('submit', sendChatMessage);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('beforeunload', teardownChatSocket);
 
   $('childrenSummary').addEventListener('click', (event) => {
     if (event.target.closest('[data-redeem]')) return;
@@ -342,6 +351,7 @@ async function logout() {
   } catch (error) {
     console.warn(error);
   }
+  await disablePushSubscription({ quiet: true });
   teardownChatSocket();
   clearSession();
   location.reload();
@@ -352,6 +362,7 @@ function showLogin() {
   $('app').hidden = true;
   $('floatingChat').hidden = true;
   teardownChatSocket();
+  renderNotificationControls();
   $('authCard')?.classList.add('compact-auth');
 }
 
@@ -371,6 +382,7 @@ async function showApp() {
   applyRoleUi();
   initFloatingChat();
   await loadBootstrap();
+  await initPushNotifications();
   if (isParent() && session.user.mustChangePassword) {
     setStatus('Password Anda baru saja direset admin. Segera ubah password di menu Akun.');
     openTab('account');
@@ -1243,6 +1255,7 @@ function renderAccount() {
   $('accountFamilyId').value = account.family_id || session.user.familyId || '';
   $('accountEmail').value = account.email || session.user.email || '';
   $('accountCreatedAt').value = formatDateTime(account.created_at || '');
+  renderNotificationControls();
 }
 
 async function saveAccountProfile(event) {
@@ -1356,6 +1369,7 @@ function initFloatingChat() {
   $('chatPanel').hidden = true;
   $('chatMessages').innerHTML = '';
   setChatStatus('Menghubungkan chat...');
+  renderPresence();
   connectFamilyChat();
 }
 
@@ -1387,6 +1401,7 @@ function connectFamilyChat() {
   chatSocket.addEventListener('open', () => {
     chatConnected = true;
     setChatStatus('Terhubung');
+    startPresenceHeartbeat();
   });
 
   chatSocket.addEventListener('message', (event) => {
@@ -1396,17 +1411,15 @@ function connectFamilyChat() {
     } catch (error) {
       return;
     }
-    if (payload.type === 'history') {
-      (payload.items || []).forEach((item) => renderChatItem(item));
-      return;
-    }
-    renderChatItem(payload);
+    handleChatPayload(payload);
   });
 
   chatSocket.addEventListener('close', () => {
     chatConnected = false;
+    stopPresenceHeartbeat();
     setChatStatus('Terputus. Mencoba sambung ulang...');
-    setTimeout(() => {
+    clearTimeout(chatReconnectTimer);
+    chatReconnectTimer = setTimeout(() => {
       if (session?.token) connectFamilyChat();
     }, 2000);
   });
@@ -1417,11 +1430,32 @@ function connectFamilyChat() {
 }
 
 function teardownChatSocket() {
+  stopPresenceHeartbeat();
+  clearTimeout(chatReconnectTimer);
   if (chatSocket) {
     try { chatSocket.close(); } catch (_) {}
   }
   chatSocket = null;
   chatConnected = false;
+}
+
+function handleChatPayload(payload) {
+  if (!payload) return;
+  if (payload.type === 'history') {
+    (payload.items || []).forEach((item) => renderChatItem(item));
+    return;
+  }
+  if (payload.type === 'presence_snapshot' || payload.type === 'presence_update') {
+    latestPresence = {
+      onlineCount: Number(payload.onlineCount || payload.count || 0),
+      members: Array.isArray(payload.members) ? payload.members : [],
+      updatedAt: payload.updatedAt || new Date().toISOString()
+    };
+    renderPresence();
+    return;
+  }
+  renderChatItem(payload);
+  maybeShowForegroundNotification(payload);
 }
 
 function renderChatItem(item) {
@@ -1467,6 +1501,227 @@ function sendChatMessage(event) {
   }
   chatSocket.send(JSON.stringify({ text }));
   $('chatInput').value = '';
+}
+
+function startPresenceHeartbeat() {
+  stopPresenceHeartbeat();
+  sendPresenceHeartbeat();
+  presenceHeartbeatTimer = setInterval(sendPresenceHeartbeat, PRESENCE_HEARTBEAT_MS);
+}
+
+function stopPresenceHeartbeat() {
+  if (presenceHeartbeatTimer) clearInterval(presenceHeartbeatTimer);
+  presenceHeartbeatTimer = null;
+}
+
+function sendPresenceHeartbeat() {
+  if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+  try {
+    chatSocket.send(JSON.stringify({
+      type: 'presence_heartbeat',
+      visible: document.visibilityState === 'visible',
+      sentAt: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.warn('Heartbeat presence gagal dikirim', error);
+  }
+}
+
+function renderPresence() {
+  const el = $('chatPresence');
+  if (!el) return;
+  if (!latestPresence.updatedAt) {
+    el.textContent = 'Online: memeriksa...';
+    return;
+  }
+  const count = Number(latestPresence.onlineCount || 0);
+  const names = latestPresence.members
+    .map((member) => member.displayName || member.name || member.childName || member.headOfFamily || '')
+    .filter(Boolean)
+    .slice(0, 3);
+  const summary = names.length ? ` (${names.join(', ')}${count > names.length ? ', ...' : ''})` : '';
+  el.textContent = `Online: ${count} perangkat${summary}`;
+}
+
+function handleVisibilityChange() {
+  if (!document.hidden) {
+    sendPresenceHeartbeat();
+  }
+}
+
+async function getServiceWorkerRegistration() {
+  if (!('serviceWorker' in navigator)) return null;
+  if (swRegistration) return swRegistration;
+  try {
+    swRegistration = await navigator.serviceWorker.ready;
+    return swRegistration;
+  } catch (error) {
+    console.warn('Service worker belum siap', error);
+    return null;
+  }
+}
+
+async function initPushNotifications() {
+  await loadPushPublicKey();
+  renderNotificationControls();
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!session?.token) return;
+  if (Notification.permission === 'granted') {
+    await syncPushSubscription().catch((error) => {
+      console.warn('Sinkronisasi push gagal', error);
+      renderNotificationControls(error.message);
+    });
+  }
+}
+
+function renderNotificationControls(message = '') {
+  const support = $('notificationSupportText');
+  const status = $('notificationStatusText');
+  const button = $('enableNotificationsBtn');
+  if (!support || !status || !button) return;
+
+  const isSupported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+  if (!isSupported) {
+    support.textContent = 'Browser ini belum mendukung push notification untuk PWA.';
+    status.textContent = 'Gunakan Chrome Android atau Safari iPhone dari shortcut Home Screen.';
+    button.disabled = true;
+    button.textContent = 'Notifikasi Belum Didukung';
+    return;
+  }
+
+  support.textContent = pushPublicKey
+    ? 'Perangkat ini mendukung push notification.'
+    : 'Frontend siap, tetapi public key push backend belum diisi di config.js.';
+
+  if (Notification.permission === 'granted') {
+    status.textContent = message || 'Notifikasi perangkat sudah diizinkan.';
+    button.disabled = !pushPublicKey;
+    button.textContent = pushPublicKey ? 'Sinkronkan Notifikasi' : 'Menunggu Konfigurasi Backend';
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    status.textContent = 'Izin notifikasi ditolak di browser/perangkat ini.';
+    button.disabled = true;
+    button.textContent = 'Notifikasi Diblokir';
+    return;
+  }
+
+  status.textContent = message || 'Notifikasi belum aktif.';
+  button.disabled = false;
+  button.textContent = 'Aktifkan Notifikasi';
+}
+
+async function enablePushNotifications() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    setStatus('Browser ini belum mendukung push notification.');
+    renderNotificationControls();
+    return;
+  }
+  if (!session?.token) {
+    setStatus('Silakan login dulu sebelum mengaktifkan notifikasi.');
+    return;
+  }
+  await loadPushPublicKey();
+  if (!pushPublicKey) {
+    setStatus('Public key push backend belum diisi di config.js.');
+    renderNotificationControls();
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    renderNotificationControls('Izin notifikasi belum diberikan.');
+    setStatus('Izin notifikasi belum diberikan.');
+    return;
+  }
+
+  await syncPushSubscription();
+  renderNotificationControls('Notifikasi siap dipakai di perangkat ini.');
+  setStatus('Notifikasi perangkat berhasil diaktifkan.');
+}
+
+async function syncPushSubscription() {
+  if (!session?.token || !pushPublicKey) return;
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) throw new Error('Service worker belum siap.');
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(pushPublicKey)
+    });
+  }
+
+  try {
+    await apiPost('savePushSubscription', { subscription: subscription.toJSON() });
+  } catch (error) {
+    if (!/Action|404|tidak dikenali/i.test(String(error.message || ''))) throw error;
+    console.warn('Backend belum mendukung savePushSubscription.');
+  }
+}
+
+async function loadPushPublicKey() {
+  if (pushPublicKey) return pushPublicKey;
+  try {
+    const data = await apiGet('getPushPublicKey', {}, false);
+    pushPublicKey = String(data.publicKey || '').trim();
+  } catch (error) {
+    console.warn('Public key push belum tersedia dari backend', error);
+  }
+  return pushPublicKey;
+}
+
+async function disablePushSubscription(options = {}) {
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) return;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return;
+  const endpoint = subscription.endpoint;
+  try {
+    await subscription.unsubscribe();
+  } catch (error) {
+    console.warn('Gagal unsubscribe push', error);
+  }
+  try {
+    await apiPost('deletePushSubscription', { endpoint });
+  } catch (error) {
+    if (!options.quiet) console.warn('Backend belum mendukung deletePushSubscription.', error);
+  }
+}
+
+async function maybeShowForegroundNotification(item) {
+  if (!item || item.type !== 'chat') return;
+  if (document.visibilityState === 'visible') return;
+  const me = isChild() ? session?.user?.childName : session?.user?.headOfFamily;
+  if (item.from && item.from === me) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const title = item.from ? `Pesan baru dari ${item.from}` : 'Pesan baru';
+  const body = item.text || 'Buka aplikasi untuk membaca pesan.';
+  const registration = await getServiceWorkerRegistration();
+  if (registration?.showNotification) {
+    await registration.showNotification(title, {
+      body,
+      icon: './assets/icons/icon-192.png',
+      badge: './assets/icons/icon-192.png',
+      data: { url: './', type: 'chat' }
+    });
+    return;
+  }
+  new Notification(title, { body });
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
 
 function setStatus(message) {
