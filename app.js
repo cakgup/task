@@ -5,6 +5,7 @@ const POINT_MULTIPLIER = 200;
 const DEFAULT_PRAYER_LOCATION = { cityId: '1301', label: 'DKI Jakarta' };
 const PRAYER_LOCATION_KEY = 'cakgupPrayerLocation';
 const PRAYER_SCHEDULE_CACHE_KEY = 'cakgupPrayerScheduleCache';
+const CHAT_HISTORY_LIMIT = 80;
 const PRESENCE_HEARTBEAT_MS = 30000;
 
 let session = readSession();
@@ -1372,6 +1373,7 @@ function initFloatingChat() {
   pendingChatOpenFromNotification = shouldOpenChatFromUrl();
   $('chatPanel').hidden = !pendingChatOpenFromNotification;
   $('chatMessages').innerHTML = '';
+  renderCachedChatHistory();
   setChatStatus('Menghubungkan chat...');
   renderPresence();
   connectFamilyChat();
@@ -1446,7 +1448,11 @@ function teardownChatSocket() {
 function handleChatPayload(payload) {
   if (!payload) return;
   if (payload.type === 'history') {
-    (payload.items || []).forEach((item) => renderChatItem(item));
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    if (items.length) {
+      renderChatHistory(items, { replace: true });
+      saveChatHistory(items);
+    }
     return;
   }
   if (payload.type === 'presence_snapshot' || payload.type === 'presence_update') {
@@ -1459,6 +1465,7 @@ function handleChatPayload(payload) {
     return;
   }
   renderChatItem(payload);
+  appendChatHistory(payload);
   maybeShowForegroundNotification(payload);
 }
 
@@ -1478,6 +1485,14 @@ function renderChatItem(item) {
   box.scrollTop = box.scrollHeight;
 }
 
+function renderChatHistory(items, options = {}) {
+  const box = $('chatMessages');
+  if (!box) return;
+  if (options.replace) box.innerHTML = '';
+  items.forEach((item) => renderChatItem(item));
+  if (options.scrollToLatest !== false) scrollChatToLatest();
+}
+
 function setChatStatus(text) {
   const el = $('chatStatus');
   if (el) el.textContent = text;
@@ -1486,6 +1501,7 @@ function setChatStatus(text) {
 function toggleChatPanel() {
   if ($('chatPanel').hidden) {
     $('chatPanel').hidden = false;
+    scrollChatToLatest();
   } else {
     closeChatPanel();
   }
@@ -1505,6 +1521,41 @@ function sendChatMessage(event) {
   }
   chatSocket.send(JSON.stringify({ text }));
   $('chatInput').value = '';
+}
+
+function chatHistoryStorageKey() {
+  const familyKey = session?.user?.familyId || session?.user?.email || 'default';
+  return `cakgupChatHistory_${familyKey}`;
+}
+
+function readChatHistory() {
+  const rows = readJsonStorage(chatHistoryStorageKey(), []);
+  return Array.isArray(rows) ? rows : [];
+}
+
+function saveChatHistory(items) {
+  writeJsonStorage(chatHistoryStorageKey(), (items || []).slice(-CHAT_HISTORY_LIMIT));
+}
+
+function appendChatHistory(item) {
+  const next = readChatHistory();
+  next.push(item);
+  saveChatHistory(next);
+}
+
+function renderCachedChatHistory() {
+  const cached = readChatHistory();
+  if (!cached.length) return;
+  renderChatHistory(cached, { replace: true });
+  setChatStatus('Menampilkan riwayat lokal. Menyambungkan ulang...');
+}
+
+function scrollChatToLatest() {
+  const box = $('chatMessages');
+  if (!box) return;
+  requestAnimationFrame(() => {
+    box.scrollTop = box.scrollHeight;
+  });
 }
 
 function startPresenceHeartbeat() {
@@ -1742,6 +1793,7 @@ function shouldOpenChatFromUrl() {
 function applyPendingChatOpen() {
   if (!pendingChatOpenFromNotification) return;
   $('chatPanel').hidden = false;
+  scrollChatToLatest();
   pendingChatOpenFromNotification = false;
   try {
     const url = new URL(window.location.href);
