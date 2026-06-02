@@ -30,6 +30,7 @@ let presenceHeartbeatTimer = null;
 let swRegistration = null;
 let latestPresence = { onlineCount: 0, members: [], updatedAt: '' };
 let pushPublicKey = cfg.PUSH_PUBLIC_KEY || '';
+let pendingChatOpenFromNotification = false;
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
@@ -207,6 +208,7 @@ function bindEvents() {
   $('chatCloseBtn')?.addEventListener('click', closeChatPanel);
   $('chatForm')?.addEventListener('submit', sendChatMessage);
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('online', handleNetworkOnline);
   window.addEventListener('beforeunload', teardownChatSocket);
 
   $('childrenSummary').addEventListener('click', (event) => {
@@ -383,6 +385,7 @@ async function showApp() {
   initFloatingChat();
   await loadBootstrap();
   await initPushNotifications();
+  applyPendingChatOpen();
   if (isParent() && session.user.mustChangePassword) {
     setStatus('Password Anda baru saja direset admin. Segera ubah password di menu Akun.');
     openTab('account');
@@ -1366,7 +1369,8 @@ function normalizeBill(row) {
 }
 
 function initFloatingChat() {
-  $('chatPanel').hidden = true;
+  pendingChatOpenFromNotification = shouldOpenChatFromUrl();
+  $('chatPanel').hidden = !pendingChatOpenFromNotification;
   $('chatMessages').innerHTML = '';
   setChatStatus('Menghubungkan chat...');
   renderPresence();
@@ -1546,7 +1550,13 @@ function renderPresence() {
 function handleVisibilityChange() {
   if (!document.hidden) {
     sendPresenceHeartbeat();
+    reconnectChatIfNeeded();
+    applyPendingChatOpen();
   }
+}
+
+function handleNetworkOnline() {
+  reconnectChatIfNeeded();
 }
 
 async function getServiceWorkerRegistration() {
@@ -1706,11 +1716,40 @@ async function maybeShowForegroundNotification(item) {
       body,
       icon: './assets/icons/icon-192.png',
       badge: './assets/icons/icon-192.png',
-      data: { url: './', type: 'chat' }
+      data: { url: './?chat=1', type: 'chat' }
     });
     return;
   }
   new Notification(title, { body });
+}
+
+function reconnectChatIfNeeded() {
+  if (!session?.token) return;
+  if (chatSocket && chatSocket.readyState === WebSocket.OPEN) return;
+  if (chatSocket && chatSocket.readyState === WebSocket.CONNECTING) return;
+  connectFamilyChat();
+}
+
+function shouldOpenChatFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    return url.searchParams.get('chat') === '1';
+  } catch (error) {
+    return false;
+  }
+}
+
+function applyPendingChatOpen() {
+  if (!pendingChatOpenFromNotification) return;
+  $('chatPanel').hidden = false;
+  pendingChatOpenFromNotification = false;
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('chat');
+    window.history.replaceState({}, '', url.toString());
+  } catch (error) {
+    console.warn('Gagal membersihkan parameter chat', error);
+  }
 }
 
 function urlBase64ToUint8Array(base64String) {
