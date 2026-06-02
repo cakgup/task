@@ -176,6 +176,13 @@ button[type="submit"], .primary { width: 100%; color: var(--blue-3); background:
 .form-section { display: grid; gap: 12px; }
 .form-section + .form-section { padding-top: 20px; border-top: 1px solid var(--line-soft); }
 .form-section h2 { margin: 0; }
+.redemptions-panel { display: grid; gap: 18px; }
+.redemptions-panel .form-section { gap: 14px; }
+.redemptions-panel .section-head { margin: 4px 0 0; }
+.redemptions-panel .section-head h2 { margin: 0; line-height: 1.1; }
+.redemptions-panel .redeem-action { margin: 0; gap: 10px; }
+.redemptions-panel .redeem-action p { margin: 0; }
+.redemptions-panel .task-list { margin-top: 0; }
 .account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 .account-grid .form-section + .form-section { padding-top: 0; border-top: 0; }
 .danger-zone { border-color: #fee2e2; }
