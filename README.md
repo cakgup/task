@@ -30,8 +30,8 @@ Edit `task/config.js`:
 
 ```js
 window.CAKGUP_CONFIG = {
-  API_URL: 'https://task-api.cakgup.workers.dev',
-  DEFAULT_PARENT_EMAIL: 'cakgup'
+  API_URL: 'https://nama_api.akun.workers.dev',
+  DEFAULT_PARENT_EMAIL: 'akun@email.com'
 };
 ```
 
