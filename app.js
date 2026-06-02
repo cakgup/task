@@ -134,13 +134,18 @@ async function handleApiResponse(response) {
   }
 
   if (!response.ok || json.success === false) {
-    if (response.status === 401) {
+    if (response.status === 401 && isSessionAuthFailure(json.message)) {
       clearSession();
       showLogin();
     }
     throw new Error(json.message || `HTTP ${response.status}`);
   }
   return json;
+}
+
+function isSessionAuthFailure(message) {
+  const text = String(message || '').toLowerCase();
+  return text.includes('sesi tidak ditemukan') || text.includes('sesi tidak valid') || text.includes('kedaluwarsa');
 }
 
 function init() {
