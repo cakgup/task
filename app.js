@@ -6,6 +6,7 @@ const DEFAULT_PRAYER_LOCATION = { cityId: '1301', label: 'DKI Jakarta' };
 const PRAYER_LOCATION_KEY = 'cakgupPrayerLocation';
 const PRAYER_SCHEDULE_CACHE_KEY = 'cakgupPrayerScheduleCache';
 const CHAT_HISTORY_LIMIT = 80;
+const TASK_PROPOSAL_RETENTION_MS = 24 * 60 * 60 * 1000;
 const PRESENCE_HEARTBEAT_MS = 30000;
 
 let session = readSession();
@@ -529,15 +530,27 @@ function readTaskProposalsLocal() {
 }
 
 function saveTaskProposalsLocal(list) {
-  localStorage.setItem(taskProposalStorageKey(), JSON.stringify(list));
+  localStorage.setItem(taskProposalStorageKey(), JSON.stringify(filterVisibleTaskProposals(list)));
+}
+
+function filterVisibleTaskProposals(list) {
+  const now = Date.now();
+  return (Array.isArray(list) ? list : []).filter((item) => {
+    if (!item) return false;
+    if (item.status === 'PENDING') return true;
+    if (!['APPROVED', 'REJECTED'].includes(String(item.status || '').toUpperCase())) return true;
+    const decidedAt = Date.parse(item.decidedAt || item.decided_at || '');
+    if (Number.isNaN(decidedAt)) return false;
+    return now - decidedAt < TASK_PROPOSAL_RETENTION_MS;
+  });
 }
 
 async function loadTaskProposals() {
   try {
     const data = await apiGet('getTaskProposals');
-    taskProposals = data.data || [];
+    taskProposals = filterVisibleTaskProposals(data.data || []);
   } catch (error) {
-    taskProposals = readTaskProposalsLocal();
+    taskProposals = filterVisibleTaskProposals(readTaskProposalsLocal());
   }
   taskProposals.sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')));
   renderTaskProposalAlert();
