@@ -510,7 +510,7 @@ async function loadTemplates() {
 
 async function loadRedemptions() {
   const data = await apiGet('getRedemptions');
-  redemptions = data.data || [];
+  redemptions = filterVisibleRedemptions(data.data || []);
   renderRedemptions();
 }
 
@@ -534,6 +534,18 @@ function saveTaskProposalsLocal(list) {
 }
 
 function filterVisibleTaskProposals(list) {
+  const now = Date.now();
+  return (Array.isArray(list) ? list : []).filter((item) => {
+    if (!item) return false;
+    if (item.status === 'PENDING') return true;
+    if (!['APPROVED', 'REJECTED'].includes(String(item.status || '').toUpperCase())) return true;
+    const decidedAt = Date.parse(item.decidedAt || item.decided_at || '');
+    if (Number.isNaN(decidedAt)) return false;
+    return now - decidedAt < TASK_PROPOSAL_RETENTION_MS;
+  });
+}
+
+function filterVisibleRedemptions(list) {
   const now = Date.now();
   return (Array.isArray(list) ? list : []).filter((item) => {
     if (!item) return false;
@@ -735,6 +747,7 @@ function taskCard(task) {
   const parentMeta = `<div class="meta">
       <span class="pill">${escapeHtml(task.namaAnak)}</span>
       <span class="pill">${escapeHtml(task.tanggalTugas)}</span>
+      <span class="pill">${task.isRecurring ? 'Rutin harian' : 'Sekali saja'}</span>
       <span class="pill status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span>
       <div class="actions chore-actions">
         <button onclick="setTaskStatus('${escapeJs(task.id)}','${nextStatus}')">${isDone ? 'Batalkan' : 'Selesai'}</button>
@@ -745,6 +758,7 @@ function taskCard(task) {
   const childMeta = `<div class="task-child-meta compact-child-meta">
       <div class="task-compact-row task-compact-row-info">
         <span class="task-inline-text">Beban: ${task.beban}</span>
+        <span class="task-inline-text">${task.isRecurring ? 'Rutin harian' : 'Sekali saja'}</span>
         <strong class="task-points">${task.beban * POINT_MULTIPLIER} poin jika selesai</strong>
         ${task.deskripsi ? `<span class="task-inline-text">${escapeHtml(task.deskripsi)}</span>` : ''}
       </div>
@@ -774,6 +788,8 @@ async function saveTask(event) {
   if (!isParent()) return;
 
   const id = $('taskId').value || uid('tsk');
+  const existing = tasks.find((item) => item.id === id);
+  const kind = document.querySelector('input[name="taskKind"]:checked')?.value || 'one_time';
   const task = {
     id,
     tanggalTugas: $('taskDate').value,
@@ -782,26 +798,31 @@ async function saveTask(event) {
     deskripsi: $('description').value.trim(),
     kategori: $('category').value,
     beban: Number($('load').value || 1),
-    status: tasks.find((item) => item.id === id)?.status || 'Belum'
+    status: existing?.status || 'Belum',
+    isRecurring: kind === 'recurring',
+    createdFromTemplateId: $('taskTemplateId').value || existing?.createdFromTemplateId || ''
   };
 
-  await apiPost(tasks.some((item) => item.id === id) ? 'updateTask' : 'addTask', { task });
+  const response = await apiPost(existing ? 'updateTask' : 'addTask', { task });
+  if (response?.templateId !== undefined) $('taskTemplateId').value = response.templateId || '';
   resetTaskForm();
   await loadTasks();
   openTab('tasks');
-  setStatus('Tugas tersimpan.');
+  setStatus(task.isRecurring ? 'Tugas rutin harian tersimpan dan akan dimunculkan otomatis setiap hari.' : 'Tugas sekali saja tersimpan.');
 }
 
 function editTask(id) {
   const task = tasks.find((item) => item.id === id);
   if (!task || !isParent()) return;
   $('taskId').value = task.id;
+  $('taskTemplateId').value = task.createdFromTemplateId || '';
   $('title').value = task.judul;
   $('child').value = task.namaAnak;
   $('category').value = task.kategori;
   $('taskDate').value = task.tanggalTugas;
   $('load').value = task.beban;
   $('description').value = task.deskripsi || '';
+  document.querySelectorAll('input[name="taskKind"]').forEach((input) => { input.checked = input.value === (task.isRecurring ? 'recurring' : 'one_time'); });
   openTab('add');
 }
 
@@ -813,16 +834,19 @@ async function setTaskStatus(id, status) {
 
 async function deleteTask(id) {
   if (!isParent() || !confirm('Hapus tugas ini?')) return;
+  const task = tasks.find((item) => item.id === id);
   await apiPost('deleteTask', { id });
   await loadTasks();
-  setStatus('Tugas dihapus.');
+  setStatus(task?.isRecurring ? 'Tugas rutin dihapus dan tidak akan dibuat otomatis lagi.' : 'Tugas dihapus.');
 }
 
 function resetTaskForm() {
   $('taskForm').reset();
   $('taskId').value = '';
+  $('taskTemplateId').value = '';
   $('taskDate').value = today();
   $('load').value = 1;
+  document.querySelectorAll('input[name="taskKind"]').forEach((input) => { input.checked = input.value === 'one_time'; });
 }
 
 function renderBills() {
@@ -1356,8 +1380,10 @@ function normalizeTask(row) {
     judul: row.judul || row.title || '',
     beban: Number(row.beban || row.load || 1),
     kategori: row.kategori || row.category || 'Lainnya',
+    isRecurring: row.isRecurring === true || row.is_recurring === 1,
     status: row.status === 'Selesai' || row.is_completed === 1 ? 'Selesai' : 'Belum',
     deskripsi: row.deskripsi || row.description || '',
+    createdFromTemplateId: row.createdFromTemplateId || row.created_from_template_id || '',
     waktuSelesai: row.waktuSelesai || row.waktu_selesai || ''
   };
 }

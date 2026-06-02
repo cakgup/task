@@ -207,6 +207,7 @@
           <h2>Tambah / Ubah Tugas</h2>
           <form id="taskForm" class="task-form">
             <input type="hidden" id="taskId" />
+            <input type="hidden" id="taskTemplateId" />
             <label>Judul Tugas<input id="title" required placeholder="Contoh: Menyapu ruang tamu" /></label>
             <label>Anak<select id="child" required></select></label>
             <label>Kategori
@@ -218,7 +219,13 @@
                 <option>Lainnya</option>
               </select>
             </label>
+            <fieldset class="choice-fieldset">
+              <legend>Jenis tugas</legend>
+              <label class="radio-card"><input type="radio" name="taskKind" value="one_time" checked /> Sekali saja</label>
+              <label class="radio-card"><input type="radio" name="taskKind" value="recurring" /> Rutin harian</label>
+            </fieldset>
             <label>Tanggal<input id="taskDate" type="date" required /></label>
+            <p class="form-hint">Jika dipilih rutin harian, tugas ini juga disimpan sebagai template dan akan muncul otomatis setiap hari berikutnya.</p>
             <label>Beban<input id="load" type="number" min="1" step="1" value="1" required /></label>
             <label>Deskripsi<textarea id="description" rows="3" placeholder="Catatan singkat tugas"></textarea></label>
             <button type="submit" class="primary">Simpan Tugas</button>
