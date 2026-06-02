@@ -44,23 +44,6 @@ npx wrangler d1 execute task-db --file=./migrasi_data_lama.sql --remote   # opsi
 npx wrangler deploy
 ```
 
-## Akun Default Cakgup
-
-Orang tua:
-
-```text
-Email keluarga: cakgup
-Password: cakgup
-```
-
-Anak:
-
-```text
-Email keluarga: cakgup
-Nama anak: Fatiyyah / Alifah / Fatih
-PIN awal: 1234
-```
-
 ## Catatan Keamanan
 
 Password, PIN, token sesi, dan captcha tidak disimpan dalam bentuk polos. Backend menyimpan hash SHA-256 bersalt untuk password/PIN dan hash token untuk sesi. Untuk produksi besar, disarankan menambahkan rate limiting berbasis IP/user-agent di Cloudflare WAF atau Durable Object.
@@ -68,19 +51,3 @@ Password, PIN, token sesi, dan captcha tidak disimpan dalam bentuk polos. Backen
 ## Update 31 Mei 2026
 
 Versi ini menambahkan UI mobile login ringkas, menu Akun, tagihan rutin/non-rutin, alarm jatuh tempo, pencairan poin sebagian, papan semangat keluarga untuk akun anak, dan navigasi yang lebih rapi. Untuk database existing, jalankan migration tambahan di `task-api/migration_update_2026_05_31.sql` sebelum deploy Worker terbaru.
-
-## Hotfix Foreign Key 31 Mei 2026
-
-Paket ini memperbaiki error saat login:
-
-```text
-D1_ERROR: FOREIGN KEY constraint failed
-```
-
-Penyebabnya adalah seeding tagihan bulanan default `cakgup` mengisi `monthly_bills.created_from_template_id`, tetapi template default belum tersedia di `bill_templates`. Backend sekarang otomatis melakukan bootstrap 15 template tagihan default sebelum seeding bulanan. Jika database D1 sudah terlanjur dibuat dan masih error, jalankan:
-
-```bash
-cd task-api
-npx wrangler d1 execute task-db --file=./migration_hotfix_fk_2026_05_31.sql --remote
-npx wrangler deploy
-```
