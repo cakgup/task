@@ -1034,6 +1034,7 @@ function resetBillTemplateForm() {
 
 function renderManage() {
   if (!isParent()) return;
+  const isDefault = session.user.email === cfg.DEFAULT_PARENT_EMAIL;
 
   $('childrenList').innerHTML = children.length
     ? children.map((child) => `<article class="mini-card">
@@ -1043,17 +1044,21 @@ function renderManage() {
       </article>`).join('')
     : '<article class="mini-card">Belum ada anak.</article>';
 
-  $('taskTemplateList').innerHTML = taskTemplates.length ? taskTemplates.map((item) => `<article class="mini-card">
+  $('taskTemplateList').innerHTML = isDefault
+    ? '<article class="mini-card">Akun cakgup memakai template tugas lama yang dikunci di backend agar struktur Fatiyyah, Alifah, dan Fatih tetap sama.</article>'
+    : (taskTemplates.length ? taskTemplates.map((item) => `<article class="mini-card">
         <strong>${escapeHtml(item.childName)} · ${escapeHtml(item.title)}</strong>
         <span>${escapeHtml(item.category)} · Beban ${item.load}</span>
         <div class="actions"><button onclick="editTaskTemplate('${escapeJs(item.templateId)}')">Edit</button><button class="danger" onclick="deleteTaskTemplate('${escapeJs(item.templateId)}')">Hapus</button></div>
-      </article>`).join('') : '<article class="mini-card">Belum ada template tugas.</article>';
+      </article>`).join('') : '<article class="mini-card">Belum ada template tugas.</article>');
 
-  $('billTemplateList').innerHTML = billTemplates.length ? billTemplates.map((item) => `<article class="mini-card">
+  $('billTemplateList').innerHTML = isDefault
+    ? '<article class="mini-card">Akun cakgup memakai 15 template tagihan lama yang dikunci di backend.</article>'
+    : (billTemplates.length ? billTemplates.map((item) => `<article class="mini-card">
         <strong>${escapeHtml(item.name)}</strong>
         <span>${escapeHtml(item.note || '-')} · tanggal ${item.dueDay || 28} · ${item.reminderEnabled ? `alarm H-${item.reminderDaysBefore || 0}` : 'alarm off'} · ${item.isActive ? 'aktif' : 'nonaktif'}</span>
         <div class="actions"><button onclick="editBillTemplate('${escapeJs(item.templateId)}')">Edit</button><button class="danger" onclick="deleteBillTemplate('${escapeJs(item.templateId)}')">Hapus</button></div>
-      </article>`).join('') : '<article class="mini-card">Belum ada template tagihan.</article>';
+      </article>`).join('') : '<article class="mini-card">Belum ada template tagihan.</article>');
 }
 
 function getCurrentChildAvailablePoints() {
