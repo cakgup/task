@@ -33,6 +33,7 @@ let swRegistration = null;
 let latestPresence = { onlineCount: 0, members: [], updatedAt: '' };
 let pushPublicKey = cfg.PUSH_PUBLIC_KEY || '';
 let pendingChatOpenFromNotification = false;
+let dataLoadState = createDataLoadState();
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
@@ -66,6 +67,24 @@ function saveSession(nextSession) {
 function clearSession() {
   session = null;
   localStorage.removeItem('cakgupSession');
+}
+
+function createDataLoadState() {
+  return {
+    children: false,
+    tasks: false,
+    taskSummary: false,
+    bills: false,
+    templates: false,
+    redemptions: false,
+    taskProposals: false,
+    account: false,
+    adminFamilies: false
+  };
+}
+
+function resetDataLoadState() {
+  dataLoadState = createDataLoadState();
 }
 
 function authHeaders() {
@@ -162,7 +181,9 @@ function bindEvents() {
 
   $('logoutBtn').addEventListener('click', logout);
   document.querySelectorAll('.tabs button').forEach((button) => {
-    button.addEventListener('click', () => openTab(button.dataset.tab));
+    button.addEventListener('click', () => {
+      activateTab(button.dataset.tab).catch(showStatusError);
+    });
   });
 
   $('filterChild').addEventListener('change', renderTasks);
@@ -365,6 +386,8 @@ function showLogin() {
   $('loginPage').hidden = false;
   $('app').hidden = true;
   $('floatingChat').hidden = true;
+  stopDailyRefresh();
+  resetDataLoadState();
   teardownChatSocket();
   renderNotificationControls();
   $('authCard')?.classList.add('compact-auth');
@@ -374,6 +397,7 @@ async function showApp() {
   $('loginPage').hidden = true;
   $('app').hidden = false;
   $('floatingChat').hidden = false;
+  resetDataLoadState();
 
   $('filterTaskDate').value = today();
   $('taskDate').value = today();
@@ -384,15 +408,22 @@ async function showApp() {
   resetBillTemplateForm();
 
   applyRoleUi();
-  initFloatingChat();
   await loadBootstrap();
-  await initPushNotifications();
-  applyPendingChatOpen();
   if (isParent() && session.user.mustChangePassword) {
     setStatus('Password Anda baru saja direset admin. Segera ubah password di menu Akun.');
-    openTab('account');
+    await activateTab('account');
   }
   startDailyRefresh();
+  window.setTimeout(() => {
+    initFloatingChat();
+    applyPendingChatOpen();
+  }, 0);
+  window.setTimeout(() => {
+    initPushNotifications().catch((error) => {
+      console.warn('Inisialisasi push notification gagal', error);
+      renderNotificationControls(error.message);
+    });
+  }, 0);
 }
 
 function applyRoleUi() {
@@ -421,18 +452,28 @@ function applyRoleUi() {
 
 async function loadBootstrap() {
   setStatus('Mengambil data keluarga...');
-  await loadChildren();
+  const date = $('filterTaskDate').value || today();
+  const month = $('filterBillMonth').value || currentMonth();
+  const data = await apiGet('getBootstrap', { date, month });
+  const bootstrap = data.data || {};
+  children = bootstrap.children || [];
+  if (isChild() && !children.length) {
+    children = [{ name: session.user.childName, schoolLevel: session.user.schoolLevel || '' }];
+  }
+  tasks = (bootstrap.tasks || []).map(normalizeTask);
+  taskSummary = {
+    stats: bootstrap.taskSummary?.stats || { total: 0, done: 0, pending: 0 },
+    children: bootstrap.taskSummary?.children || {}
+  };
+  bills = (bootstrap.bills || []).map(normalizeBill);
+  taskProposals = filterVisibleTaskProposals(bootstrap.taskProposals || []);
+  taskProposals.sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')));
+  dataLoadState.children = true;
+  dataLoadState.tasks = true;
+  dataLoadState.taskSummary = true;
+  dataLoadState.bills = isParent();
+  dataLoadState.taskProposals = isParent();
   fillChildrenOptions();
-  await Promise.all([
-    loadTasks(),
-    loadTaskSummary(),
-    loadRedemptions(),
-    loadTaskProposals(),
-    isParent() ? loadBills() : Promise.resolve(),
-    isParent() ? loadTemplates() : Promise.resolve(),
-    isParent() ? loadAccount() : Promise.resolve(),
-    session.user.isSuperAdmin ? loadFamiliesAdmin() : Promise.resolve()
-  ]);
   render();
   setStatus('Data tersinkron dari server');
 }
@@ -440,6 +481,7 @@ async function loadBootstrap() {
 async function loadChildren() {
   const data = await apiGet('getChildren');
   children = data.data || [];
+  dataLoadState.children = true;
   if (isChild() && !children.length) {
     children = [{ name: session.user.childName, schoolLevel: session.user.schoolLevel || '' }];
   }
@@ -474,15 +516,18 @@ async function loadTaskSummary() {
     stats: data.stats || { total: 0, done: 0, pending: 0 },
     children: data.children || {}
   };
+  dataLoadState.taskSummary = true;
   renderDashboard();
 }
 
-async function loadTasks() {
+async function loadTasks(options = {}) {
+  const { includeSummary = true } = options;
   const date = $('filterTaskDate').value || today();
   setStatus('Mengambil tugas...');
   const data = await apiGet('getTasks', { date });
   tasks = (data.data || []).map(normalizeTask);
-  await loadTaskSummary();
+  dataLoadState.tasks = true;
+  if (includeSummary) await loadTaskSummary();
   renderTasks();
   renderDashboard();
   setStatus('Tugas sudah dimuat.');
@@ -493,6 +538,7 @@ async function loadBills() {
   const month = $('filterBillMonth').value || currentMonth();
   const data = await apiGet('getBills', { month });
   bills = (data.data || []).map(normalizeBill);
+  dataLoadState.bills = true;
   renderBills();
   renderDashboard();
 }
@@ -505,12 +551,14 @@ async function loadTemplates() {
   ]);
   taskTemplates = taskData.data || [];
   billTemplates = billData.data || [];
+  dataLoadState.templates = true;
   renderManage();
 }
 
 async function loadRedemptions() {
   const data = await apiGet('getRedemptions');
   redemptions = filterVisibleRedemptions(data.data || []);
+  dataLoadState.redemptions = true;
   renderRedemptions();
 }
 
@@ -565,6 +613,7 @@ async function loadTaskProposals() {
     taskProposals = filterVisibleTaskProposals(readTaskProposalsLocal());
   }
   taskProposals.sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')));
+  dataLoadState.taskProposals = true;
   renderTaskProposalAlert();
   renderTaskProposals();
 }
@@ -573,6 +622,7 @@ async function loadAccount() {
   if (!isParent()) return;
   const data = await apiGet('getAccount');
   account = data.data || null;
+  dataLoadState.account = true;
   renderAccount();
 }
 
@@ -580,6 +630,7 @@ async function loadFamiliesAdmin() {
   if (!session.user.isSuperAdmin) return;
   const data = await apiGet('getFamiliesAdmin');
   adminFamilies = (data.data || []).filter((item) => item.familyId !== session.user.familyId);
+  dataLoadState.adminFamilies = true;
   const select = $('adminTargetFamily');
   if (!select) return;
   select.innerHTML = adminFamilies.length
@@ -599,6 +650,41 @@ function openTab(id) {
   });
 
   render();
+  return id;
+}
+
+async function activateTab(id) {
+  const nextTab = openTab(id);
+  await ensureTabData(nextTab);
+  return nextTab;
+}
+
+async function ensureTabData(tabId) {
+  if (tabId === 'tasks') {
+    if (!dataLoadState.tasks) await loadTasks({ includeSummary: !dataLoadState.taskSummary });
+    return;
+  }
+  if (tabId === 'bills') {
+    if (isParent() && !dataLoadState.bills) await loadBills();
+    return;
+  }
+  if (tabId === 'manage') {
+    if (isParent() && !dataLoadState.templates) await loadTemplates();
+    return;
+  }
+  if (tabId === 'redemptions') {
+    const jobs = [];
+    if (!dataLoadState.redemptions) jobs.push(loadRedemptions());
+    if (!dataLoadState.taskProposals) jobs.push(loadTaskProposals());
+    if (jobs.length) await Promise.all(jobs);
+    return;
+  }
+  if (tabId === 'account') {
+    const jobs = [];
+    if (isParent() && !dataLoadState.account) jobs.push(loadAccount());
+    if (session.user.isSuperAdmin && !dataLoadState.adminFamilies) jobs.push(loadFamiliesAdmin());
+    if (jobs.length) await Promise.all(jobs);
+  }
 }
 
 function showChildTasks(childName) {
@@ -606,7 +692,7 @@ function showChildTasks(childName) {
   $('filterTaskDate').value = today();
   $('filterStatus').value = 'all';
   openTab('tasks');
-  loadTasks().catch(showStatusError);
+  loadTasks({ includeSummary: true }).catch(showStatusError);
 }
 
 function render() {
@@ -693,8 +779,9 @@ function renderTaskProposalAlert() {
 
 function openTaskProposalsForParent() {
   if (!isParent()) return;
-  openTab('redemptions');
-  $('taskProposalSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  activateTab('redemptions')
+    .then(() => $('taskProposalSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    .catch(showStatusError);
 }
 
 function renderFamilyScoreboard() {
@@ -2166,14 +2253,25 @@ function initPrayerTimes() {
 function startDailyRefresh() {
   if (dailyRefreshTimer) return;
   dailyRefreshTimer = setInterval(async () => {
+    if (!session?.token) return;
     if (($('filterTaskDate').value || today()) === today()) {
       await loadTasks();
     }
-    if (isParent() && ($('filterBillMonth').value || currentMonth()) === currentMonth()) {
+    if (isParent() && dataLoadState.bills && ($('filterBillMonth').value || currentMonth()) === currentMonth()) {
       await loadBills();
     }
-    await loadTaskProposals();
+    if (isParent() && (dataLoadState.taskProposals || activeTab === 'dashboard' || activeTab === 'redemptions')) {
+      await loadTaskProposals();
+    }
+    if (dataLoadState.redemptions && activeTab === 'redemptions') {
+      await loadRedemptions();
+    }
   }, 60000);
+}
+
+function stopDailyRefresh() {
+  if (dailyRefreshTimer) clearInterval(dailyRefreshTimer);
+  dailyRefreshTimer = null;
 }
 
 window.editTask = editTask;
